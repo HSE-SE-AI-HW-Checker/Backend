@@ -1,5 +1,5 @@
 {
     "logger_implementation": "SimpleLogger",
-    "log_file": "Logs.txt",
+    "log_file": "tmp/Logs.txt",
     "database_implementation": "SQLite"
 }
