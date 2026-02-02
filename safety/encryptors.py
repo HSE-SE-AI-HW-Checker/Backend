@@ -5,4 +5,3 @@ def sha256(data):
 
 def bcrypt(data):
     pass
-    hashlib.algorithms_available
