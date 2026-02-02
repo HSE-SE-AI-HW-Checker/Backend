@@ -39,19 +39,19 @@ class SQLite(DB):
         password = sha256(password)
         try:
             self.execute(f"INSERT INTO users (username, email, password) VALUES ('{username}', '{email}', '{password}')")
-            return {"message": "Пользователь зарегистрирован"}
+            return {"message": "Пользователь зарегистрирован", "error": False}
         except sqlite3.IntegrityError:
-            return {"message": "Пользователь с таким email уже существует"}
+            return {"message": "Пользователь с таким email уже существует", "error": True}
         
     def check_user(self, email, password):
         password = sha256(password)
         self.execute(f"SELECT * FROM users WHERE email = '{email}'")
         if self.cursor.fetchone() is None:
-            return {"message": f"Почта {email} не зарегистрирована"}
+            return {"message": f"Почта {email} не зарегистрирована", "error": True}
         
 
         self.execute(f"SELECT * FROM users WHERE email = '{email}' AND password = '{password}'")
         if self.cursor.fetchone() is None:
-            return {"message": "Неверный пароль"}
+            return {"message": "Неверный пароль", "error": True}
         
-        return {"message": ""}
+        return {"message": "", "error": False}
