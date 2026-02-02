@@ -1,0 +1,5 @@
+{
+    "logger_implementation": "SimpleLogger",
+    "log_file": "Logs.txt",
+    "database_implementation": "SQLite"
+}
