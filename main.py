@@ -1,13 +1,10 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-import uvicorn
-from http_handler import setup_handlers
+from server import Server
+import sys
 
-PORT=8080
-app = FastAPI(title="Server", description="")
-
-# Настраиваем дополнительные обработчики
-setup_handlers(app)
+server_instance = Server(sys.argv[1:])
+app = server_instance.app
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root():
@@ -97,5 +94,5 @@ async def info():
         ]
     }
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+# if __name__ == "__main__":
+#     server_instance.run()
