@@ -15,5 +15,14 @@ class SimpleLogger(Logger):
             with open(self.file_name, 'a') as f:
                 f.write(message + '\n')
 
+class TestingLogger(Logger):
+    def __init__(self, file_name='tests/output/log.txt'):
+        self.file_name = file_name
+        with open(self.file_name, 'w') as f:
+            f.write('')
+
+    def log(self, message):
+        with open(self.file_name, 'a') as f:
+            f.write(message + '\n')
 class OtherLogger(Logger):
     pass
