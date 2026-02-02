@@ -1,0 +1,4 @@
+*.db
+Logs.txt
+__pycache__
+venv
