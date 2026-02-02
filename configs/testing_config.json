@@ -4,6 +4,6 @@
     "database_implementation": "SQLite",
     "host": "localhost",
     "port": 8080,
-    "reload": true,
-    "drop_db": false
+    "reload": false,
+    "drop_db": true
 }
