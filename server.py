@@ -1,11 +1,14 @@
 import uvicorn
 import json
+import os
+import signal
 import importlib
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 from util import get_from_config, parse_submittion
+
 
 ALIASES = {
     "--port": "port",
@@ -59,12 +62,15 @@ class Server:
             self.config = json.load(f)
 
         for key, value in self.config.items():
+            print(key, value)
             setattr(self, key, value)
         
         logger_class = getattr(importlib.import_module("logs.loggers"), self.logger_implementation)
         self.logger = logger_class(self.log_file)
         
         db_class = getattr(importlib.import_module("databases"), self.database_implementation)
+        if self.drop_db:
+            db_class.drop()
         self.db = db_class()
         
         self.app = FastAPI()
@@ -124,3 +130,12 @@ class Server:
             port=getattr(self, 'port', self.config.get('port')),
             reload=True
         )
+
+    def stop(self):
+
+        print("Called stop method")
+
+        if self.drop_db:
+            self.db.drop()
+
+        os.kill(os.getpid(), signal.SIGINT)

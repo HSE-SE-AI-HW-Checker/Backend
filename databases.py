@@ -1,20 +1,23 @@
 import sqlite3
 import hashlib
 from safety.encryptors import sha256
-
+import os
 
 class DB:
     def __init__(self):
-        pass
+        raise NotImplementedError()
 
     def execute(self, query):
-        pass
+        raise NotImplementedError()
 
     def add_user(self, username, email, password):
-        pass
+        raise NotImplementedError()
 
     def check_user(self, email, password):
-        pass
+        raise NotImplementedError()
+
+    def drop(self):
+        raise NotImplementedError()
 
 
 class SQLite(DB):
@@ -55,3 +58,7 @@ class SQLite(DB):
             return {"message": "Неверный пароль", "error": True}
         
         return {"message": "", "error": False}
+    
+    def drop():
+        print("Database dropped.")
+        os.remove('AppUsers.db')
