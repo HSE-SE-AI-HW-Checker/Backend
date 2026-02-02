@@ -14,7 +14,6 @@ ALIASES = {
     "--host": "host"
 }
 
-# Модели Pydantic
 class User(BaseModel):
     username: Optional[str] = None
     email: str
@@ -28,19 +27,29 @@ class LogMessage(BaseModel):
 
 class AuthorizationResponse(BaseModel):
     message: str
+    error: bool
+
+class RegistrationResponse(BaseModel):
+    message: str
+    error: bool
 
 class Submittion(BaseModel):
     data: str
     data_type: int
 
 class Server:
-    def __init__(self, args):
+    def __init__(self, arg: str):
+        self.__init__(self, list(arg))
+
+    def __init__(self, args: list):
         self.config = 'default_config.json'
         for arg in args:
+            if '=' not in arg:
+                setattr(self, ALIASES.get(arg, arg), True)
+                continue
             name, val = arg.split("=")
             setattr(self, ALIASES.get(name, name), val)
         
-        # Инициализация конфигурации, логгера и базы данных
         self._init_config_logger_db()
     
     def _init_config_logger_db(self):
@@ -85,14 +94,14 @@ class Server:
             self.logger.log(message)
             return {"message": "Сообщение записано в лог"}
         
-        @self.app.post("/register", response_model=BasicMessage)
+        @self.app.post("/register", response_model=RegistrationResponse)
         async def register(user: User):
             """
             Регистрация пользователя
             """
             return self.db.add_user(user.username, user.email, user.password)
 
-        @self.app.get("/authorize", response_model=BasicMessage)
+        @self.app.get("/authorize", response_model=AuthorizationResponse)
         async def authorize(user: User):
             """
             Авторизация пользователя
