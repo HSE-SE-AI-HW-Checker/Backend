@@ -1,9 +1,9 @@
 {
-    "logger_implementation": "SimpleLogger",
+    "logger_implementation": "TestingLogger",
     "log_file": "tmp/Logs.txt",
     "database_implementation": "SQLite",
     "host": "localhost",
-    "port": 8080,
+    "port": 1234,
     "reload": false,
     "drop_db": true
 }

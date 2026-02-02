@@ -10,7 +10,8 @@ def available_implementations(module_name):
         ans.append(elem.__name__)
     return ans
 
-def get_from_config(key, config='configs/default_config.json'):
+def get_from_config(key, config='default_config.json'):
+    config = f'configs/{config}'
     with open(config, 'r') as f:
         return json.load(f)[key]
     

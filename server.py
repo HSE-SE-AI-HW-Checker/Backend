@@ -48,11 +48,14 @@ class Server:
         config_path = f"configs/{self.config}"
         with open(config_path, 'r') as f:
             self.config = json.load(f)
+
+        for key, value in self.config.items():
+            setattr(self, key, value)
         
-        logger_class = getattr(importlib.import_module("logs.loggers"), self.config.get("logger_implementation"))
-        self.logger = logger_class(self.config.get("log_file"))
+        logger_class = getattr(importlib.import_module("logs.loggers"), self.logger_implementation)
+        self.logger = logger_class(self.log_file)
         
-        db_class = getattr(importlib.import_module("databases"), self.config.get("database_implementation"))
+        db_class = getattr(importlib.import_module("databases"), self.database_implementation)
         self.db = db_class()
         
         self.app = FastAPI()
