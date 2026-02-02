@@ -22,3 +22,16 @@ def parse_args(args):
         key, value = arg.split('=')
         ans[key] = value
     return ans
+
+def parse_submittion(submittion):
+    # Ссылка на git подобную штуку
+    if submittion.data_type == 0:
+        pass
+    # Архив 
+    elif submittion.data_type == 1:
+        pass
+    # Формат с окошком на каждый файл (обсуждали в личке)
+    elif submittion.data_type == 2:
+        pass
+    else:
+        return 

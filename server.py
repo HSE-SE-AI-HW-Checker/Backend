@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-from util import get_from_config
+from util import get_from_config, parse_submittion
 
 ALIASES = {
     "--port": "port",
@@ -95,6 +95,15 @@ class Server:
             Авторизация пользователя
             """
             return self.db.check_user(user.email, user.password)
+        
+        @self.app.post("/submit", response_model=BasicMessage)
+        async def submit(submittion: Submittion):
+            """
+            Отправка данных на сервер
+            """
+            # TODO: Как-то обработать
+            parse_submittion(submittion)
+            return {"message": "Данные получены сервером"}
 
     def run(self):
         uvicorn.run(
