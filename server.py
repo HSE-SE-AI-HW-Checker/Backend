@@ -28,11 +28,11 @@ class BasicMessage(BaseModel):
 class LogMessage(BaseModel):
     message: str
 
-class AuthorizationResponse(BaseModel):
+class SignInResponse(BaseModel):
     message: str
     error: bool
 
-class RegistrationResponse(BaseModel):
+class SignUpResponse(BaseModel):
     message: str
     error: bool
 
@@ -56,7 +56,6 @@ class Server:
         self._init_config_logger_db()
     
     def _init_config_logger_db(self):
-        """Инициализация конфигурации, логгера и базы данных"""
         config_path = f"configs/{self.config}"
         with open(config_path, 'r') as f:
             self.config = json.load(f)
@@ -100,15 +99,15 @@ class Server:
             self.logger.log(message)
             return {"message": "Сообщение записано в лог"}
         
-        @self.app.post("/register", response_model=RegistrationResponse)
-        async def register(user: User):
+        @self.app.post("/sign_up", response_model=SignUpResponse)
+        async def sign_up(user: User):
             """
             Регистрация пользователя
             """
             return self.db.add_user(user.username, user.email, user.password)
 
-        @self.app.get("/authorize", response_model=AuthorizationResponse)
-        async def authorize(user: User):
+        @self.app.get("/sign_in", response_model=SignInResponse)
+        async def sign_in(user: User):
             """
             Авторизация пользователя
             """
