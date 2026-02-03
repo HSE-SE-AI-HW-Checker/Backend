@@ -6,8 +6,39 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import importlib
 import json
 
-def get_main_directory():
-    return os.path.dirname(os.path.abspath(__file__))
+class BackendPath:
+    def __init__(self, path_from_root=''):
+        """
+            path_from_root - путь к файлу относительно Backend/
+        """
+        self.path = os.path.join(BackendPath._get_root_path(), path_from_root)
+
+    @staticmethod
+    def _get_root_path():
+        return os.path.dirname(os.path.abspath(__file__))
+
+    def __str__(self):
+        return self.path
+    
+    def __repr__(self):
+        return f"BackendPath('{self.path}')"
+    
+    def __fspath__(self):
+        """Поддержка протокола os.PathLike для использования с open(), os.path и т.д."""
+        return self.path
+    
+    def __truediv__(self, other):
+        """Поддержка оператора / для создания путей"""
+        return BackendPath(os.path.join(self.path, str(other)))
+    
+    def __add__(self, other):
+        """Поддержка конкатенации со строками"""
+        return str(self.path) + str(other)
+    
+    def __radd__(self, other):
+        """Поддержка конкатенации со строками слева"""
+        return str(other) + str(self.path)
+
 
 def get_implementation(module_name, class_name):
     return getattr(importlib.import_module(module_name), class_name)
@@ -19,8 +50,8 @@ def available_implementations(module_name):
     return ans
 
 def get_from_config(key, config='default_config.json'):
-    config = f'{get_main_directory()}/configs/{config}'
-    with open(config, 'r') as f:
+    config_path = os.path.join(str(BackendPath()), 'configs', config)
+    with open(config_path, 'r') as f:
         return json.load(f)[key]
 
 def get_url_from_config(config='default_config.json'):

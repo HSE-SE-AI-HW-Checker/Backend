@@ -3,7 +3,7 @@ import hashlib
 from safety.encryptors import sha256
 import os
 
-from util import get_main_directory
+from util import BackendPath
 
 class DB:
     def __init__(self):
@@ -62,5 +62,5 @@ class SQLite(DB):
         return {"message": "", "error": False}
     
     def drop():
-        if os.path.exists(f'{get_main_directory()}/AppUsers.db'):
-            os.remove(f'{get_main_directory()}/AppUsers.db')
+        if os.path.exists(BackendPath('AppUsers.db')):
+            os.remove(BackendPath('AppUsers.db'))

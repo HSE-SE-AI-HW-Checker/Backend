@@ -1,6 +1,6 @@
 {
     "logger_implementation": "TestingLogger",
-    "log_file": "tests/output/log.txt",
+    "log_file_path": "tests/output/log.txt",
     "database_implementation": "SQLite",
     "host": "localhost",
     "port": 1234,
