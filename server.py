@@ -61,7 +61,6 @@ class Server:
             self.config = json.load(f)
 
         for key, value in self.config.items():
-            print(key, value)
             setattr(self, key, value)
         
         logger_class = getattr(importlib.import_module("logs.loggers"), self.logger_implementation)
@@ -95,7 +94,6 @@ class Server:
             Запись сообщения в лог
             """
             message = log_data.message
-            print(message)
             self.logger.log(message)
             return {"message": "Сообщение записано в лог"}
         
@@ -131,9 +129,6 @@ class Server:
         )
 
     def stop(self):
-
-        print("Called stop method")
-
         if self.drop_db:
             self.db.drop()
 

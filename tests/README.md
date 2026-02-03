@@ -32,11 +32,11 @@ def test_my_endpoint():
 #### Тест регистрации пользователя
 
 ```python
-@with_test_server(config='testing_config.json', startup_delay=3)
-def test_registration():
-    url = 'http://localhost:1234/register'
+@with_test_server(config='testing_config.json', startup_delay=2, max_wait=10)
+def test_sign_up():
+    url = f'{get_url_from_config(CONFIG)}/sign_up'
     data = {'username': 'Andrew', 'email': 'andrew@gmail.com', 'password': '123456'}
-    response = requests.post(url, json=data)
+    response = requests.post(url, json=data, headers={'Content-Type': 'application/json'})
     
     assert response.status_code == 200
     assert response.json() == {'message': 'Пользователь зарегистрирован', 'error': False}
@@ -45,13 +45,58 @@ def test_registration():
 #### Тест health check
 
 ```python
-@with_test_server(config='testing_config.json', startup_delay=3)
+@with_test_server(config='testing_config.json', startup_delay=2, max_wait=10)
 def test_health_endpoint():
-    response = requests.get('http://localhost:1234/health')
+    response = requests.get(f'{BASE_URL}/health')
     
     assert response.status_code == 200
     data = response.json()
     assert data['status'] == 'healthy'
+```
+
+#### Тест авторизации
+
+```python
+@with_test_server(config='testing_config.json', startup_delay=2, max_wait=10)
+def test_sign_in_success():
+    # Регистрация
+    sign_up_url = f'{BASE_URL}/sign_up'
+    sign_up_data = {'username': 'TestUser', 'email': 'test@example.com', 'password': 'pass123'}
+    requests.post(sign_up_url, json=sign_up_data, headers=HEADERS)
+    
+    # Авторизация
+    sign_in_url = f'{BASE_URL}/sign_in'
+    sign_in_data = {'email': 'test@example.com', 'password': 'pass123'}
+    response = requests.get(sign_in_url, json=sign_in_data, headers=HEADERS)
+    
+    assert response.status_code == 200
+    assert response.json()['error'] == False
+```
+
+#### Тест логирования
+
+```python
+@with_test_server(config='testing_config.json', startup_delay=2, max_wait=10)
+def test_log_endpoint():
+    url = f'{BASE_URL}/log'
+    data = {'message': 'Тестовое сообщение'}
+    response = requests.post(url, json=data, headers=HEADERS)
+    
+    assert response.status_code == 200
+    assert response.json()['message'] == 'Сообщение записано в лог'
+```
+
+#### Тест отправки данных
+
+```python
+@with_test_server(config='testing_config.json', startup_delay=2, max_wait=10)
+def test_submit_git_link():
+    url = f'{BASE_URL}/submit'
+    data = {'data': 'https://github.com/user/repo.git', 'data_type': 0}
+    response = requests.post(url, json=data, headers=HEADERS)
+    
+    assert response.status_code == 200
+    assert response.json()['message'] == 'Данные получены сервером'
 ```
 
 ### Запуск тестов
@@ -59,8 +104,17 @@ def test_health_endpoint():
 Каждый тестовый файл можно запустить отдельно:
 
 ```bash
-python tests/test_authorization.py
 python tests/test_health_check.py
+python tests/test_sign_up.py
+python tests/test_sign_in.py
+python tests/test_log.py
+python tests/test_submit.py
+```
+
+Или запустить все тесты сразу:
+
+```bash
+python tests/run_all_tests.py
 ```
 
 ### Конфигурация тестового сервера
@@ -87,8 +141,12 @@ python tests/test_health_check.py
 tests/
 ├── README.md                 # Документация
 ├── test_utils.py            # Утилиты для тестирования (декоратор)
-├── test_authorization.py    # Тесты авторизации/регистрации
-├── test_health_check.py     # Тесты служебных эндпоинтов
+├── test_health_check.py     # Тесты служебных эндпоинтов (/health, /info)
+├── test_sign_up.py          # Тесты регистрации (/sign_up)
+├── test_sign_in.py          # Тесты авторизации (/sign_in)
+├── test_log.py              # Тесты логирования (/log)
+├── test_submit.py           # Тесты отправки данных (/submit)
+├── run_all_tests.py         # Запуск всех тестов
 ├── start_test_server.py     # Ручной запуск тестового сервера
 └── output/                  # Выходные файлы (логи и т.д.)
 ```
