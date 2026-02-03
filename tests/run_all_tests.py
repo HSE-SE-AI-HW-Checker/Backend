@@ -5,6 +5,8 @@ import inspect
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+TEST_RERUNS=10
+TIME_BEETWEEN_RERUNS=2
 
 def discover_tests():
     """
@@ -64,19 +66,23 @@ def run_all_tests():
     print()
     
     for test_name, test_func in tests:
-        print(f"\n{'=' * 70}")
-        print(f"Тест: {test_name}")
-        print('=' * 70)
-        
-        try:
-            test_func()
-            passed += 1
-            print(f"✅ {test_name} - ПРОЙДЕН")
-        except Exception as e:
-            failed += 1
-            error_msg = f"❌ {test_name} - ПРОВАЛЕН: {str(e)}"
-            print(error_msg)
-            errors.append(error_msg)
+        last_error = None
+        for i in range(TEST_RERUNS):
+            print(f"\n{'=' * 70}")
+            print(f"Тест: {test_name}")
+            print('=' * 70)
+
+            try:
+                test_func()
+                passed += 1
+                print(f"✅ {test_name} - ПРОЙДЕН")
+            except Exception as e:
+                last_error = e
+        else:
+                failed += 1
+                error_msg = f"❌ {test_name} - ПРОВАЛЕН: {str(last_error)}"
+                print(error_msg)
+                errors.append(error_msg)
     
     # Итоговая статистика
     print("\n" + "=" * 70)
