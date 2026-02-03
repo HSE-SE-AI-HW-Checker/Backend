@@ -1,3 +1,8 @@
+import os
+import sys
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 import importlib
 import json
 
@@ -11,10 +16,13 @@ def available_implementations(module_name):
     return ans
 
 def get_from_config(key, config='default_config.json'):
-    config = f'configs/{config}'
+    config = f'{os.path.dirname(os.path.abspath(__file__))}/configs/{config}'
     with open(config, 'r') as f:
         return json.load(f)[key]
-    
+
+def get_url_from_config(config='default_config.json'):
+    return f'http://{get_from_config("host", config)}:{get_from_config("port", config)}'
+
 def parse_args(args):
     ans = {}
     for arg in args:

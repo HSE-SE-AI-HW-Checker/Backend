@@ -1,11 +1,14 @@
 import uvicorn
 import json
+import os
+import signal
 import importlib
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 from util import get_from_config, parse_submittion
+
 
 ALIASES = {
     "--port": "port",
@@ -25,11 +28,11 @@ class BasicMessage(BaseModel):
 class LogMessage(BaseModel):
     message: str
 
-class AuthorizationResponse(BaseModel):
+class SignInResponse(BaseModel):
     message: str
     error: bool
 
-class RegistrationResponse(BaseModel):
+class SignUpResponse(BaseModel):
     message: str
     error: bool
 
@@ -53,18 +56,20 @@ class Server:
         self._init_config_logger_db()
     
     def _init_config_logger_db(self):
-        """Инициализация конфигурации, логгера и базы данных"""
         config_path = f"configs/{self.config}"
         with open(config_path, 'r') as f:
             self.config = json.load(f)
 
         for key, value in self.config.items():
+            print(key, value)
             setattr(self, key, value)
         
         logger_class = getattr(importlib.import_module("logs.loggers"), self.logger_implementation)
         self.logger = logger_class(self.log_file)
         
         db_class = getattr(importlib.import_module("databases"), self.database_implementation)
+        if self.drop_db:
+            db_class.drop()
         self.db = db_class()
         
         self.app = FastAPI()
@@ -94,15 +99,15 @@ class Server:
             self.logger.log(message)
             return {"message": "Сообщение записано в лог"}
         
-        @self.app.post("/register", response_model=RegistrationResponse)
-        async def register(user: User):
+        @self.app.post("/sign_up", response_model=SignUpResponse)
+        async def sign_up(user: User):
             """
             Регистрация пользователя
             """
             return self.db.add_user(user.username, user.email, user.password)
 
-        @self.app.get("/authorize", response_model=AuthorizationResponse)
-        async def authorize(user: User):
+        @self.app.get("/sign_in", response_model=SignInResponse)
+        async def sign_in(user: User):
             """
             Авторизация пользователя
             """
@@ -124,3 +129,12 @@ class Server:
             port=getattr(self, 'port', self.config.get('port')),
             reload=True
         )
+
+    def stop(self):
+
+        print("Called stop method")
+
+        if self.drop_db:
+            self.db.drop()
+
+        os.kill(os.getpid(), signal.SIGINT)
