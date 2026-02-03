@@ -1,6 +1,8 @@
+from util import get_main_directory
+
 class Logger:
-    def __init__(self):
-        raise NotImplementedError()
+    def __init__(self, file_name):
+        self.file_name = f'{get_main_directory()}/{file_name}'
 
     def log(self, message):
         raise NotImplementedError()
@@ -17,7 +19,7 @@ class SimpleLogger(Logger):
 
 class TestingLogger(Logger):
     def __init__(self, file_name='tests/output/log.txt'):
-        self.file_name = file_name
+        super().__init__(file_name)
         with open(self.file_name, 'w') as f:
             f.write('')
 

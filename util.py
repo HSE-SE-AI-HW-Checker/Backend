@@ -6,6 +6,9 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import importlib
 import json
 
+def get_main_directory():
+    return os.path.dirname(os.path.abspath(__file__))
+
 def get_implementation(module_name, class_name):
     return getattr(importlib.import_module(module_name), class_name)
 
@@ -16,7 +19,7 @@ def available_implementations(module_name):
     return ans
 
 def get_from_config(key, config='default_config.json'):
-    config = f'{os.path.dirname(os.path.abspath(__file__))}/configs/{config}'
+    config = f'{get_main_directory()}/configs/{config}'
     with open(config, 'r') as f:
         return json.load(f)[key]
 

@@ -3,6 +3,8 @@ import hashlib
 from safety.encryptors import sha256
 import os
 
+from util import get_main_directory
+
 class DB:
     def __init__(self):
         raise NotImplementedError()
@@ -60,5 +62,5 @@ class SQLite(DB):
         return {"message": "", "error": False}
     
     def drop():
-        print("Database dropped.")
-        os.remove('AppUsers.db')
+        if os.path.exists(f'{get_main_directory()}/AppUsers.db'):
+            os.remove(f'{get_main_directory()}/AppUsers.db')

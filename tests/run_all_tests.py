@@ -1,42 +1,56 @@
 import os
 import sys
+import importlib
+import inspect
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Импортируем все тестовые функции
-from test_health_check import test_health_endpoint, test_info_endpoint
-from test_sign_up import test_sign_up
-from test_sign_in import test_sign_in_success, test_sign_in_wrong_password, test_sign_in_nonexistent_user
-from test_log import test_log_endpoint, test_log_endpoint_empty_message, test_log_endpoint_long_message
-from test_submit import (
-    test_submit_git_link,
-    test_submit_archive,
-    test_submit_file_format,
-    test_submit_unknown_type,
-    test_submit_empty_data
-)
+
+def discover_tests():
+    """
+    Автоматическое обнаружение всех тестовых функций
+    
+    Ищет все файлы test_*.py в директории tests и находит в них
+    все функции, начинающиеся с test_
+    
+    Returns:
+        list: Список кортежей (имя_теста, функция_теста)
+    """
+    tests = []
+    tests_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # Получаем список всех файлов в директории tests
+    for filename in sorted(os.listdir(tests_dir)):
+        # Ищем только файлы test_*.py
+        if filename.startswith('test_') and filename.endswith('.py'):
+            module_name = filename[:-3]  # Убираем .py
+            
+            try:
+                # Импортируем модуль
+                module = importlib.import_module(module_name)
+                
+                # Ищем все функции, начинающиеся с test_
+                for name, obj in inspect.getmembers(module):
+                    if name.startswith('test_') and inspect.isfunction(obj):
+                        # Формируем читаемое имя теста
+                        test_display_name = f"{module_name}.{name}"
+                        tests.append((test_display_name, obj))
+                        
+            except Exception as e:
+                print(f"⚠️  Не удалось загрузить модуль {module_name}: {e}")
+    
+    return tests
 
 
 def run_all_tests():
     """
     Запуск всех тестов
     """
-    tests = [
-        ("Health Check", test_health_endpoint),
-        ("Info Endpoint", test_info_endpoint),
-        ("Sign Up", test_sign_up),
-        ("Sign In - Success", test_sign_in_success),
-        ("Sign In - Wrong Password", test_sign_in_wrong_password),
-        ("Sign In - Nonexistent User", test_sign_in_nonexistent_user),
-        ("Log Endpoint", test_log_endpoint),
-        ("Log - Empty Message", test_log_endpoint_empty_message),
-        ("Log - Long Message", test_log_endpoint_long_message),
-        ("Submit - Git Link", test_submit_git_link),
-        ("Submit - Archive", test_submit_archive),
-        ("Submit - File Format", test_submit_file_format),
-        ("Submit - Unknown Type", test_submit_unknown_type),
-        ("Submit - Empty Data", test_submit_empty_data),
-    ]
+    tests = discover_tests()
+    
+    if not tests:
+        print("❌ Тесты не найдены!")
+        return 0, 0
     
     passed = 0
     failed = 0
@@ -44,6 +58,8 @@ def run_all_tests():
     
     print("=" * 70)
     print("ЗАПУСК ВСЕХ ТЕСТОВ")
+    print("=" * 70)
+    print(f"Найдено тестов: {len(tests)}")
     print("=" * 70)
     print()
     

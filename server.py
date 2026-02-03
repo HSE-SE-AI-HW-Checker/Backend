@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-from util import get_from_config, parse_submittion
+from util import get_from_config, parse_submittion, get_main_directory
 
 
 ALIASES = {
@@ -56,7 +56,7 @@ class Server:
         self._init_config_logger_db()
     
     def _init_config_logger_db(self):
-        config_path = f"configs/{self.config}"
+        config_path = f"{get_main_directory()}/configs/{self.config}"
         with open(config_path, 'r') as f:
             self.config = json.load(f)
 
