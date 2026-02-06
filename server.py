@@ -4,6 +4,7 @@ import os
 import signal
 import importlib
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
@@ -73,6 +74,13 @@ class Server:
         self.db = db_class()
         
         self.app = FastAPI()
+        self.app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
         self._setup_handlers()
     
     def _setup_handlers(self):
@@ -105,7 +113,7 @@ class Server:
             """
             return self.db.add_user(user.username, user.email, user.password)
 
-        @self.app.get("/sign_in", response_model=SignInResponse)
+        @self.app.post("/sign_in", response_model=SignInResponse)
         async def sign_in(user: User):
             """
             Авторизация пользователя
