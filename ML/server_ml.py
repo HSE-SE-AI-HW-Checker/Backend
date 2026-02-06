@@ -11,7 +11,7 @@ from model import Model
 from util import MLPath
 
 DEFAULT_CONFIG_SETTINGS = {
-    'server': {'host': '0.0.0.0', 'port': 8000},
+    'server': {'host': '0.0.0.0', 'port': 8081},
     'model': {'name': 'gpt2'}
 }
 
@@ -59,7 +59,8 @@ class ServerML:
     def _setup_handlers(self):
         @self.app.post("/ask_ai")
         async def ask_ai(message: PromptMessage):
-            return {"message": self.model.responde(message.prompt)}
+            print(f"Received prompt {message.prompt}")
+            return {"message": self.model.respond(message.prompt)}
         
         @self.app.get("/health")
         async def health_check():

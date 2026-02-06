@@ -7,8 +7,9 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-from util import get_from_config, parse_submittion, BackendPath
+from util import parse_homework_data, BackendPath, get_ml_server_address
 
+import requests
 
 ALIASES = {
     "--port": "port",
@@ -36,7 +37,7 @@ class SignUpResponse(BaseModel):
     message: str
     error: bool
 
-class Submittion(BaseModel):
+class HomeworkData(BaseModel):
     data: str
     data_type: int
 
@@ -112,13 +113,23 @@ class Server:
             return self.db.check_user(user.email, user.password)
         
         @self.app.post("/submit", response_model=BasicMessage)
-        async def submit(submittion: Submittion):
+        async def submit(homework_data: HomeworkData):
             """
             Отправка данных на сервер
             """
             # TODO: Как-то обработать
-            parse_submittion(submittion)
-            return {"message": "Данные получены сервером"}
+            parse_homework_data(homework_data)
+
+            response = requests.post(
+                f'{get_ml_server_address()}/ask_ai',
+                json={
+                    "prompt": homework_data.data,
+                    "is_agent": False
+                },
+                headers={'Content-Type': 'application/json'}
+            )
+
+            return response.json()
 
     def run(self):
         uvicorn.run(
