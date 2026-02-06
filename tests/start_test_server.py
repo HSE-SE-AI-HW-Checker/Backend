@@ -16,7 +16,7 @@ if __name__ == "__main__":
   RELOAD = get_from_config('reload', CONFIG)
 
   uvicorn.run(
-    "main:app",
+    "main_backend:app",
     host=HOST,
     port=PORT,
     reload=RELOAD

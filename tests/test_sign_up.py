@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
 from util import get_from_config, get_url_from_config
-from test_utils import with_test_server
+from tests.utils_for_tests import with_test_server, my_print
 
 CONFIG = 'testing_config.json'
 
@@ -22,18 +22,18 @@ def test_sign_up():
 
     try:
         assert response.status_code == 200
-        print("✓ Статус код 200")
+        my_print("✓ Статус код 200")
 
         assert response.json() == {'message': 'Пользователь зарегистрирован', 'error': False}
-        print("✓ Ответ сервера корректен")
+        my_print("✓ Ответ сервера корректен")
         
-        print("\n✅ Все тесты пройдены успешно!")
+        my_print("\n✅ Все тесты пройдены успешно!")
 
     except requests.exceptions.ConnectionError:
-        print("❌ Ошибка подключения к серверу")
+        my_print("❌ Ошибка подключения к серверу")
         raise
     except AssertionError as e:
-        print(f"❌ Тест провален: {e}")
+        my_print(f"❌ Тест провален: {e}")
         raise
 
 if __name__ == "__main__":

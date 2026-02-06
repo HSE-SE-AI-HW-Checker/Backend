@@ -7,28 +7,65 @@ from functools import wraps
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import importlib
+import inspect
 import uvicorn
-from util import get_from_config
+from util import get_from_config, MLPath
 
+def my_print(arg=''):
+    if '-v' in sys.argv:
+        print(arg)
 
-def run_server_process(config_name):
+def discover_tests(tests_dir):
     """
-    Функция для запуска сервера в отдельном процессе
+    Автоматическое обнаружение всех тестовых функций
+    
+    Ищет все файлы test_*.py в директории tests и находит в них
+    все функции, начинающиеся с test_
+    
+    Returns:
+        list: Список кортежей (имя_теста, функция_теста)
     """
-    sys.argv = ['', f'config={config_name}']
+    tests = []
+    
+    # Получаем список всех файлов в директории tests
+    for filename in sorted(os.listdir(tests_dir)):
+        # Ищем только файлы test_*.py
+        if filename.startswith('test_') and filename.endswith('.py'):
+            module_name = filename[:-3]  # Убираем .py
+            
+            try:
+                # Импортируем модуль
+                module = importlib.import_module(module_name)
+                
+                # Ищем все функции, начинающиеся с test_
+                for name, obj in inspect.getmembers(module):
+                    if name.startswith('test_') and inspect.isfunction(obj):
+                        # Формируем читаемое имя теста
+                        test_display_name = f"{module_name}.{name}"
+                        tests.append((test_display_name, obj))
+                        
+            except Exception as e:
+                print(f"⚠️  Не удалось загрузить модуль {module_name}: {e}")
+    
+    return tests
+
+def run_server(config_name, server_type='backend'):
+    sys.argv.append(f'config={config_name}')
     
     HOST = get_from_config('host', config_name)
     PORT = get_from_config('port', config_name)
     RELOAD = get_from_config('reload', config_name)
-    
+
+    sys.path.append(MLPath())
+
     uvicorn.run(
-        "main:app",
+        f"main_{server_type}:app",
         host=HOST,
         port=PORT,
         reload=RELOAD,
-        log_level="error"  # Уменьшаем вывод логов
+        log_level="error"
     )
-
 
 def wait_for_server(host, port, timeout=10, check_interval=0.5):
     """
@@ -58,7 +95,7 @@ def wait_for_server(host, port, timeout=10, check_interval=0.5):
     return False
 
 
-def with_test_server(config='testing_config.json', startup_delay=5, max_wait=10):
+def with_test_server(config='testing_config.json', server_type='backend', startup_delay=5, max_wait=10):
     """
     Декоратор для запуска тестового сервера в отдельном процессе
     
@@ -81,8 +118,8 @@ def with_test_server(config='testing_config.json', startup_delay=5, max_wait=10)
             
             # Создаем процесс для запуска сервера
             server_process = multiprocessing.Process(
-                target=run_server_process,
-                args=(config,),
+                target=run_server,
+                args=(config, server_type),
                 daemon=True  # Процесс будет автоматически завершен при выходе
             )
             
@@ -100,7 +137,7 @@ def with_test_server(config='testing_config.json', startup_delay=5, max_wait=10)
                         f"Проверьте конфигурацию и логи."
                     )
                 
-                print(f"✓ Тестовый сервер запущен на http://{HOST}:{PORT}")
+                my_print(f"✓ Тестовый сервер запущен на http://{HOST}:{PORT}")
                 
                 # Выполняем тестовую функцию
                 result = test_func(*args, **kwargs)
@@ -118,7 +155,7 @@ def with_test_server(config='testing_config.json', startup_delay=5, max_wait=10)
                         server_process.kill()
                         server_process.join()
                 
-                print("✓ Тестовый сервер остановлен")
+                my_print("✓ Тестовый сервер остановлен")
         
         return wrapper
     return decorator

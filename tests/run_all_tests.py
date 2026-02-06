@@ -5,77 +5,49 @@ import inspect
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from tests.utils_for_tests import discover_tests
+
 TEST_RERUNS=10
 TIME_BEETWEEN_RERUNS=2
 
-def discover_tests():
-    """
-    Автоматическое обнаружение всех тестовых функций
-    
-    Ищет все файлы test_*.py в директории tests и находит в них
-    все функции, начинающиеся с test_
-    
-    Returns:
-        list: Список кортежей (имя_теста, функция_теста)
-    """
-    tests = []
-    tests_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # Получаем список всех файлов в директории tests
-    for filename in sorted(os.listdir(tests_dir)):
-        # Ищем только файлы test_*.py
-        if filename.startswith('test_') and filename.endswith('.py'):
-            module_name = filename[:-3]  # Убираем .py
-            
-            try:
-                # Импортируем модуль
-                module = importlib.import_module(module_name)
-                
-                # Ищем все функции, начинающиеся с test_
-                for name, obj in inspect.getmembers(module):
-                    if name.startswith('test_') and inspect.isfunction(obj):
-                        # Формируем читаемое имя теста
-                        test_display_name = f"{module_name}.{name}"
-                        tests.append((test_display_name, obj))
-                        
-            except Exception as e:
-                print(f"⚠️  Не удалось загрузить модуль {module_name}: {e}")
-    
-    return tests
-
+def my_print(arg=''):
+    VERBOSE = '-v' in sys.argv
+    if VERBOSE:
+        print(arg)
 
 def run_all_tests():
     """
     Запуск всех тестов
     """
-    tests = discover_tests()
-    
+    tests = discover_tests(os.path.dirname(os.path.abspath(__file__)))
+
     if not tests:
-        print("❌ Тесты не найдены!")
+        my_print("❌ Тесты не найдены!")
         return 0, 0
     
     passed = 0
     failed = 0
     errors = []
     
-    print("=" * 70)
-    print("ЗАПУСК ВСЕХ ТЕСТОВ")
-    print("=" * 70)
-    print(f"Найдено тестов: {len(tests)}")
-    print("=" * 70)
-    print()
+    my_print("=" * 70)
+    my_print("ЗАПУСК ВСЕХ ТЕСТОВ")
+    my_print("=" * 70)
+    my_print(f"Найдено тестов: {len(tests)}")
+    my_print("=" * 70)
+    my_print()
     
     for test_name, test_func in tests:
         last_error = None
         for i in range(TEST_RERUNS):
-            print(f"\n{'=' * 70}")
-            print(f"Тест: {test_name}")
-            print('=' * 70)
+            my_print(f"\n{'=' * 70}")
+            my_print(f"Тест: {test_name}")
+            my_print('=' * 70)
 
             try:
                 test_func()
                 passed += 1
                 print(f"✅ {test_name} - ПРОЙДЕН")
+                break
             except Exception as e:
                 last_error = e
         else:
@@ -85,22 +57,22 @@ def run_all_tests():
                 errors.append(error_msg)
     
     # Итоговая статистика
-    print("\n" + "=" * 70)
-    print("ИТОГОВАЯ СТАТИСТИКА")
-    print("=" * 70)
-    print(f"Всего тестов: {len(tests)}")
-    print(f"✅ Пройдено: {passed}")
-    print(f"❌ Провалено: {failed}")
+    my_print("\n" + "=" * 70)
+    my_print("ИТОГОВАЯ СТАТИСТИКА")
+    my_print("=" * 70)
+    my_print(f"Всего тестов: {len(tests)}")
+    my_print(f"✅ Пройдено: {passed}")
+    my_print(f"❌ Провалено: {failed}")
     print(f"Процент успеха: {(passed / len(tests) * 100):.1f}%")
     
     if errors:
-        print("\n" + "=" * 70)
-        print("ОШИБКИ:")
-        print("=" * 70)
+        my_print("\n" + "=" * 70)
+        my_print("ОШИБКИ:")
+        my_print("=" * 70)
         for error in errors:
-            print(error)
+            my_print(error)
     
-    print("\n" + "=" * 70)
+    my_print("\n" + "=" * 70)
     
     return passed, failed
 

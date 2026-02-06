@@ -24,7 +24,7 @@ class DB:
 
 class SQLite(DB):
     def __init__(self):
-        self.connection = sqlite3.connect('AppUsers.db')
+        self.connection = sqlite3.connect(BackendPath('AppUsers.db'))
         self.cursor = self.connection.cursor()
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

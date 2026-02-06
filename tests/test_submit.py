@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
 from util import get_url_from_config
-from test_utils import with_test_server
+from tests.utils_for_tests import with_test_server, my_print
 
 CONFIG = 'testing_config.json'
 
@@ -27,14 +27,14 @@ def test_submit_git_link():
     response = requests.post(url, json=data, headers=HEADERS)
     
     assert response.status_code == 200, f"Ожидался статус 200, получен {response.status_code}"
-    print("✓ Статус код 200")
+    my_print("✓ Статус код 200")
     
     response_data = response.json()
     assert 'message' in response_data, "Отсутствует поле 'message' в ответе"
     assert response_data['message'] == 'Данные получены сервером', f"Неожиданное сообщение: {response_data['message']}"
-    print("✓ Ответ сервера корректен")
+    my_print("✓ Ответ сервера корректен")
     
-    print("\n✅ Тест отправки git ссылки пройден успешно!")
+    my_print("\n✅ Тест отправки git ссылки пройден успешно!")
 
 
 @with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
@@ -51,14 +51,14 @@ def test_submit_archive():
     response = requests.post(url, json=data, headers=HEADERS)
     
     assert response.status_code == 200, f"Ожидался статус 200, получен {response.status_code}"
-    print("✓ Статус код 200")
+    my_print("✓ Статус код 200")
     
     response_data = response.json()
     assert 'message' in response_data, "Отсутствует поле 'message' в ответе"
     assert response_data['message'] == 'Данные получены сервером', f"Неожиданное сообщение: {response_data['message']}"
-    print("✓ Ответ сервера корректен")
+    my_print("✓ Ответ сервера корректен")
     
-    print("\n✅ Тест отправки архива пройден успешно!")
+    my_print("\n✅ Тест отправки архива пройден успешно!")
 
 
 @with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
@@ -75,14 +75,14 @@ def test_submit_file_format():
     response = requests.post(url, json=data, headers=HEADERS)
     
     assert response.status_code == 200, f"Ожидался статус 200, получен {response.status_code}"
-    print("✓ Статус код 200")
+    my_print("✓ Статус код 200")
     
     response_data = response.json()
     assert 'message' in response_data, "Отсутствует поле 'message' в ответе"
     assert response_data['message'] == 'Данные получены сервером', f"Неожиданное сообщение: {response_data['message']}"
-    print("✓ Ответ сервера корректен")
+    my_print("✓ Ответ сервера корректен")
     
-    print("\n✅ Тест отправки файлового формата пройден успешно!")
+    my_print("\n✅ Тест отправки файлового формата пройден успешно!")
 
 
 @with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
@@ -99,14 +99,14 @@ def test_submit_unknown_type():
     response = requests.post(url, json=data, headers=HEADERS)
     
     assert response.status_code == 200, f"Ожидался статус 200, получен {response.status_code}"
-    print("✓ Статус код 200")
+    my_print("✓ Статус код 200")
     
     response_data = response.json()
     assert 'message' in response_data, "Отсутствует поле 'message' в ответе"
     assert response_data['message'] == 'Данные получены сервером', f"Неожиданное сообщение: {response_data['message']}"
-    print("✓ Неизвестный тип данных обработан корректно")
+    my_print("✓ Неизвестный тип данных обработан корректно")
     
-    print("\n✅ Тест отправки неизвестного типа данных пройден успешно!")
+    my_print("\n✅ Тест отправки неизвестного типа данных пройден успешно!")
 
 
 @with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
@@ -123,38 +123,38 @@ def test_submit_empty_data():
     response = requests.post(url, json=data, headers=HEADERS)
     
     assert response.status_code == 200, f"Ожидался статус 200, получен {response.status_code}"
-    print("✓ Статус код 200")
+    my_print("✓ Статус код 200")
     
     response_data = response.json()
     assert 'message' in response_data, "Отсутствует поле 'message' в ответе"
     assert response_data['message'] == 'Данные получены сервером'
-    print("✓ Пустые данные обработаны корректно")
+    my_print("✓ Пустые данные обработаны корректно")
     
-    print("\n✅ Тест отправки пустых данных пройден успешно!")
+    my_print("\n✅ Тест отправки пустых данных пройден успешно!")
 
 
 if __name__ == "__main__":
-    print("=" * 50)
-    print("Запуск теста отправки git ссылки")
-    print("=" * 50)
+    my_print("=" * 50)
+    my_print("Запуск теста отправки git ссылки")
+    my_print("=" * 50)
     test_submit_git_link()
     
-    print("\n" + "=" * 50)
-    print("Запуск теста отправки архива")
-    print("=" * 50)
+    my_print("\n" + "=" * 50)
+    my_print("Запуск теста отправки архива")
+    my_print("=" * 50)
     test_submit_archive()
     
-    print("\n" + "=" * 50)
-    print("Запуск теста отправки файлового формата")
-    print("=" * 50)
+    my_print("\n" + "=" * 50)
+    my_print("Запуск теста отправки файлового формата")
+    my_print("=" * 50)
     test_submit_file_format()
     
-    print("\n" + "=" * 50)
-    print("Запуск теста отправки неизвестного типа")
-    print("=" * 50)
+    my_print("\n" + "=" * 50)
+    my_print("Запуск теста отправки неизвестного типа")
+    my_print("=" * 50)
     test_submit_unknown_type()
     
-    print("\n" + "=" * 50)
-    print("Запуск теста отправки пустых данных")
-    print("=" * 50)
+    my_print("\n" + "=" * 50)
+    my_print("Запуск теста отправки пустых данных")
+    my_print("=" * 50)
     test_submit_empty_data()

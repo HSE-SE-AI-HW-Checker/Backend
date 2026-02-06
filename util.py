@@ -5,6 +5,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import importlib
 import json
+import yaml
 
 class BackendPath:
     def __init__(self, path_from_root=''):
@@ -40,6 +41,10 @@ class BackendPath:
         return str(other) + str(self.path)
 
 
+class MLPath(BackendPath):
+    def __init__(self, path_from_root=''):
+        super().__init__(os.path.join('ML', path_from_root))
+
 def get_implementation(module_name, class_name):
     return getattr(importlib.import_module(module_name), class_name)
 
@@ -66,15 +71,23 @@ def parse_args(args):
         ans[key] = value
     return ans
 
-def parse_submittion(submittion):
+def get_ml_server_address():
+    with open(MLPath('configs/active_config.yaml')) as f:
+        config = yaml.safe_load(f)
+    HOST = config.get('server', {}).get('host', '0.0.0.0')
+    PORT = config.get('server', {}).get('port', 8001)
+
+    return f'http://{HOST}:{PORT}'
+
+def parse_homework_data(homework_data):
     # Ссылка на git подобную штуку
-    if submittion.data_type == 0:
+    if homework_data.data_type == 0:
         pass
     # Архив 
-    elif submittion.data_type == 1:
+    elif homework_data.data_type == 1:
         pass
     # Формат с окошком на каждый файл (обсуждали в личке)
-    elif submittion.data_type == 2:
+    elif homework_data.data_type == 2:
         pass
     else:
         return 
