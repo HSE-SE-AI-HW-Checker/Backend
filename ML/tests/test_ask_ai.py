@@ -7,16 +7,12 @@ import requests
 
 HEADERS = {'Content-Type': 'application/json'}
 
-def test_ask_ai():
+def test_ask_ai(url):
     response = requests.post(
-        "http://localhost:8000/ask_ai",
+        url,
         json={"prompt": "Some of the best dishes for breakfast are: "},
         headers=HEADERS
     )
 
     assert response.status_code == 200
     print(f"{response.json().get('message')}")
-
-
-if __name__ == "__main__":
-    test_ask_ai()

@@ -5,50 +5,16 @@ import inspect
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from tests.utils_for_tests import discover_tests
+
 TEST_RERUNS=10
 TIME_BEETWEEN_RERUNS=2
-
-def discover_tests():
-    """
-    Автоматическое обнаружение всех тестовых функций
-    
-    Ищет все файлы test_*.py в директории tests и находит в них
-    все функции, начинающиеся с test_
-    
-    Returns:
-        list: Список кортежей (имя_теста, функция_теста)
-    """
-    tests = []
-    tests_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # Получаем список всех файлов в директории tests
-    for filename in sorted(os.listdir(tests_dir)):
-        # Ищем только файлы test_*.py
-        if filename.startswith('test_') and filename.endswith('.py'):
-            module_name = filename[:-3]  # Убираем .py
-            
-            try:
-                # Импортируем модуль
-                module = importlib.import_module(module_name)
-                
-                # Ищем все функции, начинающиеся с test_
-                for name, obj in inspect.getmembers(module):
-                    if name.startswith('test_') and inspect.isfunction(obj):
-                        # Формируем читаемое имя теста
-                        test_display_name = f"{module_name}.{name}"
-                        tests.append((test_display_name, obj))
-                        
-            except Exception as e:
-                print(f"⚠️  Не удалось загрузить модуль {module_name}: {e}")
-    
-    return tests
-
 
 def run_all_tests():
     """
     Запуск всех тестов
     """
-    tests = discover_tests()
+    tests = discover_tests(os.path.dirname(os.path.abspath(__file__)))
     
     if not tests:
         print("❌ Тесты не найдены!")
@@ -76,6 +42,7 @@ def run_all_tests():
                 test_func()
                 passed += 1
                 print(f"✅ {test_name} - ПРОЙДЕН")
+                break
             except Exception as e:
                 last_error = e
         else:
