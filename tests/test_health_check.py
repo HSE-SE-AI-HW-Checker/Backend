@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
 from util import get_from_config
-from test_utils import with_test_server
+from tests.utils_for_tests import with_test_server
 
 CONFIG = 'testing_config.json'
 

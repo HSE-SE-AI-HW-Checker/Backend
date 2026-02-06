@@ -40,6 +40,10 @@ class BackendPath:
         return str(other) + str(self.path)
 
 
+class MLPath(BackendPath):
+    def __init__(self, path_from_root=''):
+        super().__init__(os.path.join('ML', path_from_root))
+
 def get_implementation(module_name, class_name):
     return getattr(importlib.import_module(module_name), class_name)
 
