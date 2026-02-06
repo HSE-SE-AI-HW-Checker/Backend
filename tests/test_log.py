@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
 from util import get_url_from_config
-from tests.utils_for_tests import with_test_server
+from tests.utils_for_tests import with_test_server, my_print
 
 CONFIG = 'testing_config.json'
 
@@ -24,14 +24,14 @@ def test_log_endpoint():
     response = requests.post(url, json=data, headers=HEADERS)
     
     assert response.status_code == 200, f"Ожидался статус 200, получен {response.status_code}"
-    print("✓ Статус код 200")
+    my_print("✓ Статус код 200")
     
     response_data = response.json()
     assert 'message' in response_data, "Отсутствует поле 'message' в ответе"
     assert response_data['message'] == 'Сообщение записано в лог', f"Неожиданное сообщение: {response_data['message']}"
-    print("✓ Ответ сервера корректен")
+    my_print("✓ Ответ сервера корректен")
     
-    print("\n✅ Все тесты log endpoint пройдены успешно!")
+    my_print("\n✅ Все тесты log endpoint пройдены успешно!")
 
 
 @with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
@@ -45,13 +45,13 @@ def test_log_endpoint_empty_message():
     response = requests.post(url, json=data, headers=HEADERS)
     
     assert response.status_code == 200, f"Ожидался статус 200, получен {response.status_code}"
-    print("✓ Статус код 200 для пустого сообщения")
+    my_print("✓ Статус код 200 для пустого сообщения")
     
     response_data = response.json()
     assert response_data['message'] == 'Сообщение записано в лог'
-    print("✓ Пустое сообщение обработано корректно")
+    my_print("✓ Пустое сообщение обработано корректно")
     
-    print("\n✅ Тест пустого сообщения пройден успешно!")
+    my_print("\n✅ Тест пустого сообщения пройден успешно!")
 
 
 @with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
@@ -66,27 +66,27 @@ def test_log_endpoint_long_message():
     response = requests.post(url, json=data, headers=HEADERS)
     
     assert response.status_code == 200, f"Ожидался статус 200, получен {response.status_code}"
-    print("✓ Статус код 200 для длинного сообщения")
+    my_print("✓ Статус код 200 для длинного сообщения")
     
     response_data = response.json()
     assert response_data['message'] == 'Сообщение записано в лог'
-    print("✓ Длинное сообщение обработано корректно")
+    my_print("✓ Длинное сообщение обработано корректно")
     
-    print("\n✅ Тест длинного сообщения пройден успешно!")
+    my_print("\n✅ Тест длинного сообщения пройден успешно!")
 
 
 if __name__ == "__main__":
-    print("=" * 50)
-    print("Запуск тестов log endpoint")
-    print("=" * 50)
+    my_print("=" * 50)
+    my_print("Запуск тестов log endpoint")
+    my_print("=" * 50)
     test_log_endpoint()
     
-    print("\n" + "=" * 50)
-    print("Запуск теста пустого сообщения")
-    print("=" * 50)
+    my_print("\n" + "=" * 50)
+    my_print("Запуск теста пустого сообщения")
+    my_print("=" * 50)
     test_log_endpoint_empty_message()
     
-    print("\n" + "=" * 50)
-    print("Запуск теста длинного сообщения")
-    print("=" * 50)
+    my_print("\n" + "=" * 50)
+    my_print("Запуск теста длинного сообщения")
+    my_print("=" * 50)
     test_log_endpoint_long_message()

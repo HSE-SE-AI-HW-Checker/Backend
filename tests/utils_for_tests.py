@@ -12,6 +12,10 @@ import inspect
 import uvicorn
 from util import get_from_config, MLPath
 
+def my_print(arg=''):
+    if '-v' in sys.argv:
+        print(arg)
+
 def discover_tests(tests_dir):
     """
     Автоматическое обнаружение всех тестовых функций
@@ -47,11 +51,13 @@ def discover_tests(tests_dir):
     return tests
 
 def run_server(config_name, server_type='backend'):
-    sys.argv = ['', f'config={config_name}']
+    sys.argv.append(f'config={config_name}')
     
     HOST = get_from_config('host', config_name)
     PORT = get_from_config('port', config_name)
     RELOAD = get_from_config('reload', config_name)
+
+    sys.path.append(MLPath())
 
     uvicorn.run(
         f"main_{server_type}:app",
@@ -59,43 +65,6 @@ def run_server(config_name, server_type='backend'):
         port=PORT,
         reload=RELOAD,
         log_level="error"
-    )
-    
-
-def run_server_process(config_name):
-    """
-    Функция для запуска сервера в отдельном процессе
-    """
-    sys.argv = ['', f'config={config_name}']
-    
-    HOST = get_from_config('host', config_name)
-    PORT = get_from_config('port', config_name)
-    RELOAD = get_from_config('reload', config_name)
-    
-    uvicorn.run(
-        "main:app",
-        host=HOST,
-        port=PORT,
-        reload=RELOAD,
-        log_level="error"  # Уменьшаем вывод логов
-    )
-
-def run_ml_server_process(config_name):
-    """
-    Функция для запуска сервера машинного обучения в отдельном процессе
-    """
-    sys.argv = ['', f'config={config_name}']
-    
-    HOST = get_from_config('host', config_name)
-    PORT = get_from_config('port', config_name)
-    
-    sys.path.append(MLPath())
-
-    uvicorn.run(
-        "main_ml:app",
-        host=HOST,
-        port=PORT,
-        log_level="error"  # Уменьшаем вывод логов
     )
 
 def wait_for_server(host, port, timeout=10, check_interval=0.5):
@@ -168,7 +137,7 @@ def with_test_server(config='testing_config.json', server_type='backend', startu
                         f"Проверьте конфигурацию и логи."
                     )
                 
-                print(f"✓ Тестовый сервер запущен на http://{HOST}:{PORT}")
+                my_print(f"✓ Тестовый сервер запущен на http://{HOST}:{PORT}")
                 
                 # Выполняем тестовую функцию
                 result = test_func(*args, **kwargs)
@@ -186,7 +155,7 @@ def with_test_server(config='testing_config.json', server_type='backend', startu
                         server_process.kill()
                         server_process.join()
                 
-                print("✓ Тестовый сервер остановлен")
+                my_print("✓ Тестовый сервер остановлен")
         
         return wrapper
     return decorator
