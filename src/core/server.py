@@ -1,5 +1,8 @@
+"""
+Основной сервер Backend приложения.
+"""
+
 import uvicorn
-import json
 import os
 import signal
 import importlib
@@ -8,9 +11,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-from util import parse_homework_data, BackendPath, get_ml_server_address
-
 import requests
+
+from ..utils.helpers import parse_homework_data
+from ..core.config_manager import get_ml_server_address
+from ..models.config import ServerConfig
+
 
 ALIASES = {
     "--port": "port",
@@ -19,35 +25,56 @@ ALIASES = {
     "--host": "host"
 }
 
+
 class User(BaseModel):
+    """Модель пользователя."""
     username: Optional[str] = None
     email: str
     password: str
 
+
 class BasicMessage(BaseModel):
+    """Базовое сообщение."""
     message: str
+
 
 class LogMessage(BaseModel):
+    """Сообщение для логирования."""
     message: str
+
 
 class SignInResponse(BaseModel):
+    """Ответ на запрос входа."""
     message: str
     error: bool
+
 
 class SignUpResponse(BaseModel):
+    """Ответ на запрос регистрации."""
     message: str
     error: bool
 
+
 class HomeworkData(BaseModel):
+    """Данные домашнего задания."""
     data: str
     data_type: int
 
+
 class Server:
+    """Основной класс сервера."""
+    
     def __init__(self, arg: str):
-        self.__init__(self, list(arg))
+        self.__init__(list(arg))
 
     def __init__(self, args: list):
-        self.config = 'default_config.json'
+        """
+        Инициализация сервера.
+        
+        Args:
+            args: Аргументы командной строки
+        """
+        self.config = 'default'
         for arg in args:
             if '=' not in arg:
                 setattr(self, ALIASES.get(arg, arg), True)
@@ -58,18 +85,14 @@ class Server:
         self._init_config_logger_db()
     
     def _init_config_logger_db(self):
-        config_path = BackendPath(f"configs/{self.config}")
-        with open(config_path, 'r') as f:
-            self.config = json.load(f)
-
-        for key, value in self.config.items():
-            setattr(self, key, value)
+        """Инициализация конфигурации, логгера и базы данных."""
+        self.config = ServerConfig.from_config_name(self.config)
         
-        logger_class = getattr(importlib.import_module("logs.loggers"), self.logger_implementation)
-        self.logger = logger_class(self.log_file_path)
+        logger_class = getattr(importlib.import_module("src.utils.logger"), self.config.logger_implementation)
+        self.logger = logger_class(self.config.log_file_path)
         
-        db_class = getattr(importlib.import_module("databases"), self.database_implementation)
-        if self.drop_db:
+        db_class = getattr(importlib.import_module("src.core.database_manager"), self.config.database_implementation)
+        if self.config.drop_db:
             db_class.drop()
         self.db = db_class()
         
@@ -84,12 +107,15 @@ class Server:
         self._setup_handlers()
     
     def _setup_handlers(self):
-        """Настройка обработчиков HTTP запросов"""
+        """Настройка обработчиков HTTP запросов."""
         
         @self.app.get("/health")
         async def health_check():
             """
-            Проверка здоровья сервера
+            Проверка здоровья сервера.
+            
+            Returns:
+                dict: Статус сервера
             """
             return {
                 "status": "healthy",
@@ -100,7 +126,13 @@ class Server:
         @self.app.post("/log", response_model=BasicMessage)
         async def log(log_data: LogMessage):
             """
-            Запись сообщения в лог
+            Запись сообщения в лог.
+            
+            Args:
+                log_data: Данные для логирования
+                
+            Returns:
+                dict: Подтверждение записи
             """
             message = log_data.message
             self.logger.log(message)
@@ -109,21 +141,39 @@ class Server:
         @self.app.post("/sign_up", response_model=SignUpResponse)
         async def sign_up(user: User):
             """
-            Регистрация пользователя
+            Регистрация пользователя.
+            
+            Args:
+                user: Данные пользователя
+                
+            Returns:
+                dict: Результат регистрации
             """
             return self.db.add_user(user.username, user.email, user.password)
 
         @self.app.post("/sign_in", response_model=SignInResponse)
         async def sign_in(user: User):
             """
-            Авторизация пользователя
+            Авторизация пользователя.
+            
+            Args:
+                user: Данные пользователя
+                
+            Returns:
+                dict: Результат авторизации
             """
             return self.db.check_user(user.email, user.password)
         
         @self.app.post("/submit", response_model=BasicMessage)
         async def submit(homework_data: HomeworkData):
             """
-            Отправка данных на сервер
+            Отправка данных на сервер.
+            
+            Args:
+                homework_data: Данные домашнего задания
+                
+            Returns:
+                dict: Ответ от ML сервера
             """
             # TODO: Как-то обработать
             parse_homework_data(homework_data)
@@ -140,15 +190,17 @@ class Server:
             return response.json()
 
     def run(self):
+        """Запустить сервер."""
         uvicorn.run(
             self.app,
-            host=getattr(self, 'host', self.config.get('host')),
-            port=getattr(self, 'port', self.config.get('port')),
+            host=getattr(self, 'host', self.config.host),
+            port=getattr(self, 'port', self.config.port),
             reload=True
         )
 
     def stop(self):
-        if self.drop_db:
+        """Остановить сервер."""
+        if self.config.drop_db:
             self.db.drop()
 
         os.kill(os.getpid(), signal.SIGINT)

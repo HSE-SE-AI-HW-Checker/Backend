@@ -4,11 +4,11 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import uvicorn
-from util import get_from_config
+from src.core.config_manager import get_from_config
 
 if __name__ == "__main__":
 
-  CONFIG = 'testing_config.json'
+  CONFIG = 'testing'
   sys.argv = ['', f'config={CONFIG}']
 
   HOST = get_from_config('host', CONFIG)
@@ -16,7 +16,7 @@ if __name__ == "__main__":
   RELOAD = get_from_config('reload', CONFIG)
 
   uvicorn.run(
-    "main_backend:app",
+    "src.main:app",
     host=HOST,
     port=PORT,
     reload=RELOAD

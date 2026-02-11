@@ -10,7 +10,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import importlib
 import inspect
 import uvicorn
-from util import get_from_config, MLPath
+from src.core.config_manager import get_from_config
+from src.utils.helpers import MLPath
 
 def my_print(arg=''):
     if '-v' in sys.argv:
@@ -60,7 +61,7 @@ def run_server(config_name, server_type='backend'):
     sys.path.append(MLPath())
 
     uvicorn.run(
-        f"main_{server_type}:app",
+        "src.main:app",
         host=HOST,
         port=PORT,
         reload=RELOAD,
@@ -95,7 +96,7 @@ def wait_for_server(host, port, timeout=10, check_interval=0.5):
     return False
 
 
-def with_test_server(config='testing_config.json', server_type='backend', startup_delay=5, max_wait=10):
+def with_test_server(config='testing', server_type='backend', startup_delay=5, max_wait=10):
     """
     Декоратор для запуска тестового сервера в отдельном процессе
     

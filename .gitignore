@@ -1,6 +1,35 @@
+# Database files
 *.db
+data/*.db
+
+# Log files
+*.log
 Logs.txt
-__pycache__
-venv
 log.txt
-.vscode
+logs/*.log
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test outputs
+tests/output/
