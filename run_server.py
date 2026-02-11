@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """
-Скрипт для запуска HTTP сервера
+Скрипт для запуска HTTP сервера.
 """
 import uvicorn
 import sys
 import os
-from util import parse_args, get_from_config
 
+# Добавляем корневую директорию проекта в путь
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from src.utils.helpers import parse_args
+from src.core.config_manager import get_from_config
 
 if __name__ == "__main__":
     args = parse_args(sys.argv[1:])
@@ -18,13 +21,13 @@ if __name__ == "__main__":
 
     print("Запуск HTTP сервера на FastAPI...")
     print(f"Сервер будет доступен по адресу: {HOST}:{PORT}")
-    print(f"Документация API: {HOST}:{PORT}/docs")
+    print(f"Документация API: http://{HOST}:{PORT}/docs")
     print("Для остановки сервера нажмите Ctrl+C")
     print("-" * 50)
     
     uvicorn.run(
-        "main_backend:app",
+        "src.main:app",
         host=HOST,
-        port=PORT,
+        port=int(PORT),
         reload=RELOAD
     )

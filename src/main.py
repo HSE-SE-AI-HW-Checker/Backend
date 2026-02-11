@@ -1,6 +1,10 @@
+"""
+Точка входа для Backend приложения.
+"""
+
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-from server import Server
+from .core.server import Server
 import sys
 
 server_instance = Server(sys.argv[1:])
@@ -9,7 +13,10 @@ app = server_instance.app
 @app.get("/info")
 async def info():
     """
-    Эндпоинт с информацией о сервере
+    Эндпоинт с информацией о сервере.
+    
+    Returns:
+        dict: Информация о сервере
     """
     return {
         "server": "FastAPI",

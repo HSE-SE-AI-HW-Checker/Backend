@@ -1,0 +1,23 @@
+# Конфигурация по умолчанию для production окружения
+# Этот файл содержит настройки для запуска основного сервера
+
+# Реализация логгера
+logger_implementation: SimpleLogger
+
+# Путь к файлу логов
+log_file_path: tmp/Logs.txt
+
+# Реализация базы данных
+database_implementation: SQLite
+
+# Хост сервера
+host: localhost
+
+# Порт сервера
+port: 8080
+
+# Автоматическая перезагрузка при изменении кода
+reload: true
+
+# Удаление базы данных при запуске
+drop_db: false

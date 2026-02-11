@@ -4,10 +4,10 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
-from util import get_from_config, get_url_from_config
+from src.core.config_manager import get_from_config, get_url_from_config
 from tests.utils_for_tests import with_test_server, my_print
 
-CONFIG = 'testing_config.json'
+CONFIG = 'testing'
 
 URL = f'{get_url_from_config(CONFIG)}/sign_up'
 DATA = {'username': 'Andrew', 'email': 'andrew@gmail.com', 'password': '123456'}

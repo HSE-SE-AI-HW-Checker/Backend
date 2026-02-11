@@ -4,10 +4,10 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
-from util import get_from_config
+from src.core.config_manager import get_from_config
 from tests.utils_for_tests import with_test_server, my_print
 
-CONFIG = 'testing_config.json'
+CONFIG = 'testing'
 
 HOST = get_from_config("host", CONFIG)
 PORT = get_from_config("port", CONFIG)
