@@ -8,12 +8,12 @@ import signal
 import importlib
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 import requests
 
-from ..utils.helpers import parse_homework_data
+from ..utils.helpers import parse_submitted_data
 from ..core.config_manager import get_ml_server_address
 from ..models.config import ServerConfig
 
@@ -55,10 +55,16 @@ class SignUpResponse(BaseModel):
     error: bool
 
 
-class HomeworkData(BaseModel):
+class SubmittedData(BaseModel):
     """Данные домашнего задания."""
     data: str
     data_type: int
+
+class ModelResponse(BaseModel):
+    """Модель ответа для генерации текста (non-streaming)."""
+    
+    text: str = Field(..., description="Сгенерированный текст")
+    prompt: str = Field(..., description="Исходный промпт")
 
 
 class Server:
@@ -164,25 +170,26 @@ class Server:
             """
             return self.db.check_user(user.email, user.password)
         
-        @self.app.post("/submit", response_model=BasicMessage)
-        async def submit(homework_data: HomeworkData):
+        @self.app.post("/submit", response_model=ModelResponse)
+        async def submit(submitted_data: SubmittedData):
             """
             Отправка данных на сервер.
             
             Args:
-                homework_data: Данные домашнего задания
+                submitted_data: Данные домашнего задания
                 
             Returns:
                 dict: Ответ от ML сервера
             """
             # TODO: Как-то обработать
-            parse_homework_data(homework_data)
+            parse_submitted_data(submitted_data)
 
             response = requests.post(
-                f'{get_ml_server_address()}/ask_ai',
+                f'{str(get_ml_server_address())}/generate',
                 json={
-                    "prompt": homework_data.data,
-                    "is_agent": False
+                    "prompt": submitted_data.data,
+                    "temperature": 0.3,
+                    "stream": False
                 },
                 headers={'Content-Type': 'application/json'}
             )

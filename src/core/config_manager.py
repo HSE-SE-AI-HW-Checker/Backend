@@ -44,13 +44,13 @@ def get_ml_server_address() -> str:
     Returns:
         str: URL ML сервера в формате http://host:port
     """
-    config_path = MLPath('llama_local/config.yaml')
+    config_path = MLPath('config.yaml')
     
-    with open(config_path) as f:
+    with open(str(config_path)) as f:
         config = yaml.safe_load(f)
     
     HOST = config.get('server', {}).get('host', '0.0.0.0')
-    PORT = config.get('server', {}).get('port', 8001)
+    PORT = config.get('server', {}).get('port', 8000)
 
     return f'http://{HOST}:{PORT}'
 

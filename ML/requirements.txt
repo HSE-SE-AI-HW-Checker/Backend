@@ -1,0 +1,16 @@
+# Основные зависимости для LLaMA Local
+
+# llama-cpp-python с Metal поддержкой для Apple Silicon
+# Установка с Metal: CMAKE_ARGS="-DLLAMA_METAL=on" pip install llama-cpp-python
+llama-cpp-python>=0.2.0
+
+# Работа с YAML конфигурацией
+PyYAML>=6.0
+
+# Загрузка моделей с Hugging Face
+huggingface-hub>=0.20.0
+
+# FastAPI и зависимости для API сервера
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0

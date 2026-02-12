@@ -23,11 +23,10 @@ class BackendPath:
     @staticmethod
     def _get_root_path():
         """Получить корневой путь Backend проекта."""
-        # Поднимаемся на 2 уровня вверх от src/utils/
         return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
     def __str__(self):
-        return self.path
+        return str(self.path)
     
     def __repr__(self):
         return f"BackendPath('{self.path}')"
@@ -55,11 +54,7 @@ class MLPath(BackendPath):
     """
     
     def __init__(self, path_from_root=''):
-        # Поднимаемся на уровень выше Backend и входим в ML_
-        backend_root = BackendPath._get_root_path()
-        project_root = os.path.dirname(backend_root)
-        ml_root = os.path.join(project_root, 'ML_')
-        self.path = os.path.join(ml_root, path_from_root)
+        self.path = BackendPath(f'ML/{path_from_root}')
 
 
 def get_implementation(module_name: str, class_name: str):
@@ -114,24 +109,24 @@ def parse_args(args: list) -> dict:
     return ans
 
 
-def parse_homework_data(homework_data):
+def parse_submitted_data(submitted_data):
     """
-    Парсинг данных домашнего задания.
+    Парсинг данных, отправленных на сервер.
     
     Args:
-        homework_data: Объект с данными домашнего задания
+        submitted_data: Объект с отправленными на сервер данными
         
     Returns:
-        Обработанные данные
+        Данные в формате, который может обработать ML (скорее всего base64 encoded)
     """
     # Ссылка на git подобную штуку
-    if homework_data.data_type == 0:
+    if submitted_data.data_type == 0:
         pass
     # Архив 
-    elif homework_data.data_type == 1:
+    elif submitted_data.data_type == 1:
         pass
     # Формат с окошком на каждый файл (обсуждали в личке)
-    elif homework_data.data_type == 2:
+    elif submitted_data.data_type == 2:
         pass
     else:
         return None
