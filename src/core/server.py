@@ -348,8 +348,8 @@ class Server:
                 f'{str(get_ml_server_address())}/generate',
                 json={
                     "prompt": submitted_data.data,
-                    "temperature": 0.3,
-                    "stream": False
+                    "is_agent": False,
+                    "user_id": current_user['user_id']
                 },
                 headers={'Content-Type': 'application/json'}
             )
