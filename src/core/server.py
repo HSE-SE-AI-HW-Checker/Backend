@@ -324,7 +324,7 @@ class Server:
             }
 
         @self.app.post("/submit", response_model=ModelResponse)
-        async def submit(submitted_data: SubmittedData, current_user: dict = Depends(get_current_user)):
+        async def submit(submitted_data: HomeworkData, current_user: dict = Depends(get_current_user)):
             """
             Отправка домашнего задания (защищенный эндпоинт).
 
@@ -338,7 +338,7 @@ class Server:
             # Логируем пользователя для аудита
             self.logger.log(
                 f"User {current_user['user_id']} ({current_user['email']}) "
-                f"submitted homework of type {homework_data.data_type}"
+                f"submitted homework of type {submitted_data.data_type}"
             )
 
             # TODO: Как-то обработать
