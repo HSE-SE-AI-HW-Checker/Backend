@@ -108,3 +108,24 @@ class FolderStructure:
         for file_path in sorted(self.file_contents.keys()):
             self.print_file_content(file_path)
             print()  # Пустая строка между файлами
+
+    def get_file_content(self, file_path):
+        """
+        Возвращает сохраненное содержимое файла в виде строки в формате
+        {file_path}
+        =====================
+        {file_content}
+        =====================\n
+        """
+        return f"{file_path}\n{'=' * 40}\n{self.file_contents[file_path]}\n{'=' * 40}\n"
+    
+    def get_files_content(self):
+        """
+        Возвращает сохраненное содержимое всех файлов в виде строки в формате
+        {file_path}
+        =====================
+        {file_content}
+        =====================\n
+        ...
+        """
+        return '\n'.join([self.get_file_content(file_path) for file_path in self.file_contents.keys()])

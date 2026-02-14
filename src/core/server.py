@@ -13,11 +13,10 @@ from typing import Optional
 from datetime import datetime, timedelta
 import requests
 
-from ..utils.helpers import parse_submitted_data
-from ..core.config_manager import get_ml_server_address
-from ..models.config import ServerConfig
-from ..security.dependencies import get_current_user
-
+from src.utils.helpers import parse_submitted_data
+from src.core.config_manager import get_ml_server_address
+from src.models.config import ServerConfig
+from src.services.file_processor import FolderStructure
 
 ALIASES = {
     "--port": "port",
@@ -335,21 +334,17 @@ class Server:
             Returns:
                 dict: Ответ от ML сервера
             """
-            # Логируем пользователя для аудита
-            self.logger.log(
-                f"User {current_user['user_id']} ({current_user['email']}) "
-                f"submitted homework of type {submitted_data.data_type}"
-            )
 
-            # TODO: Как-то обработать
-            parse_submitted_data(submitted_data)
+            folder_structure = parse_submitted_data(submitted_data)
+            print(folder_structure)
+            print(folder_structure.get_files_content())
 
             response = requests.post(
                 f'{str(get_ml_server_address())}/generate',
                 json={
-                    "prompt": submitted_data.data,
-                    "is_agent": False,
-                    "user_id": current_user['user_id']
+                    "prompt": folder_structure.__str__(),
+                    "temperature": 0.3,
+                    "stream": False
                 },
                 headers={'Content-Type': 'application/json'}
             )

@@ -1,6 +1,6 @@
 import requests
 import urllib.parse
-from file_processor import FolderStructure
+from src.services.file_processor import FolderStructure
 
 class GitHubRepoExplorer:
     # TODO: implement config support
