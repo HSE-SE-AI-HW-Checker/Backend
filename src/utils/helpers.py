@@ -6,7 +6,8 @@ import os
 import sys
 import importlib
 from pathlib import Path
-
+from src.services.github_service import GitHubRepoExplorer
+from src.services.archive_service import ArchiveProcessor
 
 class BackendPath:
     """
@@ -121,10 +122,12 @@ def parse_submitted_data(submitted_data):
     """
     # Ссылка на git подобную штуку
     if submitted_data.data_type == 0:
-        pass
+        explorer = GitHubRepoExplorer(token="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", whitelist=['.cpp', '.h', '.hpp', '.py', '.txt'])
+        return explorer.get_repo_contents(submitted_data.data)
     # Архив 
     elif submitted_data.data_type == 1:
-        pass
+        processor = ArchiveProcessor(whitelist=['.cpp', '.h', '.hpp', '.py', '.txt'])
+        return processor.process_base64_archive(submitted_data.data)
     # Формат с окошком на каждый файл (обсуждали в личке)
     elif submitted_data.data_type == 2:
         pass
