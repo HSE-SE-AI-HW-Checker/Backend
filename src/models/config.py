@@ -14,7 +14,7 @@ import yaml
 class ServerConfig:
     """
     Конфигурация сервера приложения.
-    
+
     Attributes:
         logger_implementation: Имя класса логгера (например, 'SimpleLogger', 'TestingLogger')
         log_file_path: Путь к файлу логов
@@ -23,6 +23,10 @@ class ServerConfig:
         port: Порт сервера (1-65535)
         reload: Флаг автоматической перезагрузки при изменении кода
         drop_db: Флаг удаления базы данных при запуске
+        jwt_secret_key: Секретный ключ для подписи JWT токенов (минимум 32 символа)
+        jwt_algorithm: Алгоритм шифрования JWT (HS256, HS384, HS512)
+        jwt_access_token_expire_minutes: Время жизни access token в минутах
+        jwt_refresh_token_expire_days: Время жизни refresh token в днях
     """
     
     logger_implementation: str
@@ -32,6 +36,12 @@ class ServerConfig:
     port: int
     reload: bool
     drop_db: bool
+
+    # JWT Authentication settings
+    jwt_secret_key: str
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 30
+    jwt_refresh_token_expire_days: int = 7
     
     def __post_init__(self):
         """Валидация полей после инициализации."""
@@ -67,9 +77,25 @@ class ServerConfig:
         # Валидация булевых полей
         if not isinstance(self.reload, bool):
             raise ValueError(f"reload должен быть булевым значением, получено: {type(self.reload).__name__}")
-        
+
         if not isinstance(self.drop_db, bool):
             raise ValueError(f"drop_db должен быть булевым значением, получено: {type(self.drop_db).__name__}")
+
+        # Валидация JWT полей
+        if not self.jwt_secret_key or not isinstance(self.jwt_secret_key, str):
+            raise ValueError("jwt_secret_key должен быть непустой строкой")
+
+        if len(self.jwt_secret_key) < 32:
+            raise ValueError(f"jwt_secret_key должен быть не менее 32 символов для безопасности, получено: {len(self.jwt_secret_key)}")
+
+        if self.jwt_algorithm not in ["HS256", "HS384", "HS512"]:
+            raise ValueError(f"jwt_algorithm должен быть HS256, HS384 или HS512, получено: {self.jwt_algorithm}")
+
+        if not isinstance(self.jwt_access_token_expire_minutes, int) or self.jwt_access_token_expire_minutes <= 0:
+            raise ValueError("jwt_access_token_expire_minutes должен быть положительным целым числом")
+
+        if not isinstance(self.jwt_refresh_token_expire_days, int) or self.jwt_refresh_token_expire_days <= 0:
+            raise ValueError("jwt_refresh_token_expire_days должен быть положительным целым числом")
     
     @classmethod
     def from_yaml(cls, file_path: str) -> 'ServerConfig':
@@ -101,7 +127,7 @@ class ServerConfig:
         # Проверка наличия всех обязательных полей
         required_fields = {
             'logger_implementation', 'log_file_path', 'database_implementation',
-            'host', 'port', 'reload', 'drop_db'
+            'host', 'port', 'reload', 'drop_db', 'jwt_secret_key'
         }
         missing_fields = required_fields - set(config_data.keys())
         
@@ -136,7 +162,7 @@ class ServerConfig:
     def to_dict(self) -> dict:
         """
         Преобразование конфигурации в словарь.
-        
+
         Returns:
             dict: Словарь с параметрами конфигурации
         """
@@ -147,7 +173,11 @@ class ServerConfig:
             'host': self.host,
             'port': self.port,
             'reload': self.reload,
-            'drop_db': self.drop_db
+            'drop_db': self.drop_db,
+            'jwt_secret_key': self.jwt_secret_key,
+            'jwt_algorithm': self.jwt_algorithm,
+            'jwt_access_token_expire_minutes': self.jwt_access_token_expire_minutes,
+            'jwt_refresh_token_expire_days': self.jwt_refresh_token_expire_days
         }
     
     def __repr__(self) -> str:

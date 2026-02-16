@@ -6,17 +6,17 @@ import uvicorn
 import os
 import signal
 import importlib
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 
-from ..utils.helpers import parse_submitted_data
-from ..core.config_manager import get_ml_server_address
-from ..models.config import ServerConfig
-
+from src.utils.helpers import parse_submitted_data
+from src.core.config_manager import get_ml_server_address
+from src.models.config import ServerConfig
+from src.services.file_processor import FolderStructure
 
 ALIASES = {
     "--port": "port",
@@ -47,15 +47,26 @@ class SignInResponse(BaseModel):
     """Ответ на запрос входа."""
     message: str
     error: bool
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    token_type: Optional[str] = None
 
 
 class SignUpResponse(BaseModel):
     """Ответ на запрос регистрации."""
     message: str
     error: bool
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    token_type: Optional[str] = None
 
 
-class SubmittedData(BaseModel):
+class LogoutResponse(BaseModel):
+    """Ответ на запрос выхода."""
+    message: str
+    success: bool
+
+class HomeworkData(BaseModel):
     """Данные домашнего задания."""
     data: str
     data_type: int
@@ -110,6 +121,10 @@ class Server:
             allow_methods=["*"],
             allow_headers=["*"],
         )
+
+        # Сохраняем server instance в app.state для доступа в dependencies
+        self.app.state.server = self
+
         self._setup_handlers()
     
     def _setup_handlers(self):
@@ -145,49 +160,189 @@ class Server:
             return {"message": "Сообщение записано в лог"}
         
         @self.app.post("/sign_up", response_model=SignUpResponse)
-        async def sign_up(user: User):
+        async def sign_up(user: User, request: Request):
             """
-            Регистрация пользователя.
-            
+            Регистрация пользователя с возвратом JWT токенов.
+
             Args:
                 user: Данные пользователя
-                
+                request: Request объект для получения IP и User-Agent
+
             Returns:
-                dict: Результат регистрации
+                dict: Результат регистрации с токенами
             """
-            return self.db.add_user(user.username, user.email, user.password)
+            from ..security.encryptors import create_tokens_pair
+
+            # Регистрируем пользователя
+            result = self.db.add_user(user.username, user.email, user.password)
+
+            if result["error"]:
+                return result
+
+            # Если регистрация успешна - создаем токены
+            user_id = result.get("user_id")
+
+            # Создаем пару токенов
+            tokens = create_tokens_pair(
+                user_id=user_id,
+                email=user.email,
+                secret_key=self.config.jwt_secret_key,
+                algorithm=self.config.jwt_algorithm,
+                access_expire_minutes=self.config.jwt_access_token_expire_minutes,
+                refresh_expire_days=self.config.jwt_refresh_token_expire_days
+            )
+
+            # Сохраняем access token в БД
+            expires_at = (datetime.now() + timedelta(
+                minutes=self.config.jwt_access_token_expire_minutes
+            )).isoformat()
+
+            user_agent = request.headers.get("user-agent")
+            ip_address = request.client.host if request.client else None
+
+            self.db.create_session(
+                user_id=user_id,
+                token=tokens["access_token"],
+                expires_at=expires_at,
+                user_agent=user_agent,
+                ip_address=ip_address
+            )
+
+            # Возвращаем результат с токенами
+            return {
+                "message": result["message"],
+                "error": False,
+                "access_token": tokens["access_token"],
+                "refresh_token": tokens["refresh_token"],
+                "token_type": tokens["token_type"]
+            }
 
         @self.app.post("/sign_in", response_model=SignInResponse)
-        async def sign_in(user: User):
+        async def sign_in(user: User, request: Request):
             """
-            Авторизация пользователя.
-            
+            Авторизация пользователя с возвратом JWT токенов.
+
             Args:
                 user: Данные пользователя
-                
+                request: Request объект
+
             Returns:
-                dict: Результат авторизации
+                dict: Результат авторизации с токенами
             """
-            return self.db.check_user(user.email, user.password)
+            from ..security.encryptors import create_tokens_pair
+
+            # Проверяем учетные данные
+            result = self.db.check_user(user.email, user.password)
+
+            if result["error"]:
+                return result
+
+            # Если вход успешен - создаем токены
+            user_id = result.get("user_id")
+
+            # Создаем пару токенов
+            tokens = create_tokens_pair(
+                user_id=user_id,
+                email=user.email,
+                secret_key=self.config.jwt_secret_key,
+                algorithm=self.config.jwt_algorithm,
+                access_expire_minutes=self.config.jwt_access_token_expire_minutes,
+                refresh_expire_days=self.config.jwt_refresh_token_expire_days
+            )
+
+            # Сохраняем access token в БД
+            expires_at = (datetime.now() + timedelta(
+                minutes=self.config.jwt_access_token_expire_minutes
+            )).isoformat()
+
+            user_agent = request.headers.get("user-agent")
+            ip_address = request.client.host if request.client else None
+
+            self.db.create_session(
+                user_id=user_id,
+                token=tokens["access_token"],
+                expires_at=expires_at,
+                user_agent=user_agent,
+                ip_address=ip_address
+            )
+
+            # Возвращаем результат с токенами
+            return {
+                "message": "",
+                "error": False,
+                "access_token": tokens["access_token"],
+                "refresh_token": tokens["refresh_token"],
+                "token_type": tokens["token_type"]
+            }
         
-        @self.app.post("/submit", response_model=ModelResponse)
-        async def submit(submitted_data: SubmittedData):
+        @self.app.post("/logout", response_model=LogoutResponse)
+        async def logout(request: Request):
             """
-            Отправка данных на сервер.
-            
+            Выход из системы (отзыв токена).
+
             Args:
-                submitted_data: Данные домашнего задания
-                
+                request: Request объект с токеном в заголовке
+
+            Returns:
+                dict: Результат операции
+            """
+            # Извлекаем токен из заголовка
+            auth_header = request.headers.get("Authorization")
+
+            if not auth_header or not auth_header.startswith("Bearer "):
+                return {
+                    "message": "Отсутствует токен авторизации",
+                    "success": False
+                }
+
+            token = auth_header.split(" ")[1]
+
+            # Отзываем токен
+            result = self.db.revoke_token(token)
+
+            return {
+                "message": result.get("message", "Выход выполнен"),
+                "success": result.get("success", False)
+            }
+
+        @self.app.get("/me")
+        async def get_profile(current_user: dict = Depends(get_current_user)):
+            """
+            Получить профиль текущего пользователя.
+
+            Args:
+                current_user: Текущий пользователь из токена
+
+            Returns:
+                dict: Информация о пользователе
+            """
+            return {
+                "user_id": current_user["user_id"],
+                "email": current_user["email"],
+                "username": current_user["username"]
+            }
+
+        @self.app.post("/submit", response_model=ModelResponse)
+        async def submit(submitted_data: HomeworkData, current_user: dict = Depends(get_current_user)):
+            """
+            Отправка домашнего задания (защищенный эндпоинт).
+
+            Args:
+                homework_data: Данные домашнего задания
+                current_user: Текущий пользователь из токена
+
             Returns:
                 dict: Ответ от ML сервера
             """
-            # TODO: Как-то обработать
-            parse_submitted_data(submitted_data)
+
+            folder_structure = parse_submitted_data(submitted_data)
+            print(folder_structure)
+            print(folder_structure.get_files_content())
 
             response = requests.post(
                 f'{str(get_ml_server_address())}/generate',
                 json={
-                    "prompt": submitted_data.data,
+                    "prompt": folder_structure.__str__(),
                     "temperature": 0.3,
                     "stream": False
                 },

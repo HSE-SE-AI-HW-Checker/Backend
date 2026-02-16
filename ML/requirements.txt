@@ -1,16 +1,33 @@
-# Основные зависимости для LLaMA Local
+# ML Framework
+torch==2.10.0
+transformers==5.0.0
 
 # llama-cpp-python с Metal поддержкой для Apple Silicon
 # Установка с Metal: CMAKE_ARGS="-DLLAMA_METAL=on" pip install llama-cpp-python
 llama-cpp-python>=0.3.0
 
-# Работа с YAML конфигурацией
-PyYAML>=6.0
+# Torch dependencies
+sympy==1.14.0
+mpmath==1.3.0
+networkx==3.6.1
+filelock==3.20.3
+fsspec==2026.1.0
+hf-xet==1.2.0
+Jinja2==3.1.6
+MarkupSafe==3.0.3
 
-# Загрузка моделей с Hugging Face
-huggingface-hub>=0.20.0
+# Web framework (for ML server)
+fastapi==0.128.0
+uvicorn==0.40.0
+pydantic==2.12.5
+pydantic_core==2.41.5
+PyYAML==6.0.3
 
-# FastAPI и зависимости для API сервера
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-pydantic>=2.0.0
+# Common
+anyio==4.12.1
+annotated-types==0.7.0
+typing_extensions==4.15.0
+starlette==0.50.0
+h11==0.16.0
+httptools==0.7.1
+click==8.3.1

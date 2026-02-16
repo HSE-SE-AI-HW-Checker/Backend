@@ -33,3 +33,5 @@ Thumbs.db
 
 # Test outputs
 tests/output/
+.vscode
+docker_builder/Tinder_sample/*
