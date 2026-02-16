@@ -1,44 +1,109 @@
-# Конфигурация LLaMA Local
+# Конфигурация ML моделей
+# Поддерживается переключение между моделями через active_model
 
-# Настройки загрузки модели
-download:
-  # ID репозитория на Hugging Face
-  repo_id: "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF"
-  
-  # Имя файла модели для загрузки
-  filename: "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
-  
-  # Автоматическая загрузка модели, если она отсутствует
-  auto_download: true
-  
-  # Токен Hugging Face (опционально, для приватных моделей)
-  # Можно также установить через переменную окружения HF_TOKEN
-  token: "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"
+# Активная модель (раскоментируй нужную модель)
 
-# Настройки модели
-model:
-  # Путь к файлу модели (GGUF формат)
-  # Примеры:
-  # - ./models/llama-3.2-1b-instruct-q4_k_m.gguf
-  # - ./models/llama-3.2-3b-instruct-q4_k_m.gguf
-  path: "./models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
-  
-  # Размер контекста (количество токенов)
-  n_ctx: 8192
-  
-  # Количество слоев для GPU offload
-  # -1 = все слои на GPU (рекомендуется для Apple Silicon с Metal)
-  # 0 = только CPU
-  # >0 = указанное количество слоев на GPU
-  n_gpu_layers: -1
-  
-  # Параметры генерации
-  temperature: 0.7      # Креативность (0.0-2.0, выше = более креативно)
-  top_p: 0.9           # Nucleus sampling (0.0-1.0)
-  top_k: 40            # Top-K sampling
-  repeat_penalty: 1.1  # Штраф за повторения (1.0 = нет штрафа)
-  max_tokens: 512      # Максимальное количество токенов в ответе
-  stream: true         # Streaming вывод токенов
+# active_model: "deepseek-coder-v2-lite"
+# active_model: "llama-3.1-8b"
+active_model: "mistral-nemo-12b"
+# active_model: "qwen-2.5-coder-14b"
+# active_model: "qwen-2.5-coder-7b"
+
+models:
+  # LLaMA 3.1 8B Instruct
+  llama-3.1-8b:
+    download:
+      repo_id: "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF"
+      filename: "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+      auto_download: true
+      token: "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"
+    model:
+      path: "./models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+      # Если видишь ошибку декодера с кодом -3, уменьшай это значение
+      n_ctx: 16384
+      n_gpu_layers: -1
+      temperature: 0.2
+      top_p: 0.9
+      top_k: 40
+      repeat_penalty: 1.1
+      max_tokens: 1024
+      stream: true
+
+  # DeepSeek Coder V2 Lite Instruct
+  deepseek-coder-v2-lite:
+    download:
+      repo_id: "bartowski/DeepSeek-Coder-V2-Lite-Instruct-GGUF"
+      filename: "DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M.gguf"
+      auto_download: true
+      token: "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"
+    model:
+      path: "./models/DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M.gguf"
+      # Если видишь ошибку декодера с кодом -3, уменьшай это значение
+      n_ctx: 20000
+      n_gpu_layers: -1
+      temperature: 0.8
+      top_p: 0.95
+      top_k: 50
+      repeat_penalty: 1.1
+      max_tokens: 1024
+      stream: true
+
+  # Mistral Nemo 12B Instruct
+  mistral-nemo-12b:
+    download:
+      repo_id: "bartowski/Mistral-Nemo-Instruct-2407-GGUF"
+      filename: "Mistral-Nemo-Instruct-2407-Q4_K_M.gguf"
+      auto_download: true
+      token: "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"
+    model:
+      path: "./models/Mistral-Nemo-Instruct-2407-Q4_K_M.gguf"
+      # Если видишь ошибку декодера с кодом -3, уменьшай это значение
+      n_ctx: 16384
+      n_gpu_layers: -1
+      temperature: 0.2
+      top_p: 0.9
+      top_k: 40
+      repeat_penalty: 1.1
+      max_tokens: 1024
+      stream: true
+
+  # Qwen 2.5 Coder 14B Instruct
+  qwen-2.5-coder-14b:
+    download:
+      repo_id: "bartowski/Qwen2.5-Coder-14B-Instruct-GGUF"
+      filename: "Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf"
+      auto_download: true
+      token: "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"
+    model:
+      path: "./models/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf"
+      # Если видишь ошибку декодера с кодом -3, уменьшай это значение
+      n_ctx: 16384
+      n_gpu_layers: -1
+      temperature: 0.2
+      top_p: 0.95
+      top_k: 40
+      repeat_penalty: 1.05
+      max_tokens: 1024
+      stream: true
+
+  # Qwen 2.5 Coder 7B Instruct
+  qwen-2.5-coder-7b:
+    download:
+      repo_id: "bartowski/Qwen2.5-Coder-7B-Instruct-GGUF"
+      filename: "Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf"
+      auto_download: true
+      token: "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"
+    model:
+      path: "./models/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf"
+      # Если видишь ошибку декодера с кодом -3, уменьшай это значение
+      n_ctx: 16384
+      n_gpu_layers: -1
+      temperature: 0.2
+      top_p: 0.95
+      top_k: 40
+      repeat_penalty: 1.05
+      max_tokens: 1024
+      stream: true
 
 # Настройки приложения
 app:

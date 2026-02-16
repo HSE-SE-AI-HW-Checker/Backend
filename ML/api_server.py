@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-FastAPI сервер для LLaMA Local.
-Предоставляет REST API для взаимодействия с локальной моделью LLaMA.
+FastAPI сервер для локального запуска ИИ моделей.
+Предоставляет REST API для взаимодействия с локальной моделью ИИ.
 """
 
 import sys
@@ -117,7 +117,7 @@ async def lifespan(app: FastAPI):
         
         # Инициализируем логгер
         logger = Logger(
-            name="llama_local_api",
+            name="AI_local_api",
             level=config_manager.app.log_level
         )
         logger.info("API сервер запущен")
@@ -148,7 +148,7 @@ async def lifespan(app: FastAPI):
             logger=logger
         )
         
-        print("Загрузка модели LLaMA...")
+        print("Загрузка модели AI...")
         logger.info("Начало загрузки модели")
         model_manager.load_model()
         logger.info("Модель успешно загружена")
@@ -178,8 +178,8 @@ async def lifespan(app: FastAPI):
 # ============================================================================
 
 app = FastAPI(
-    title="LLaMA Local API",
-    description="REST API для взаимодействия с локальной моделью LLaMA",
+    title="AI Local API",
+    description="REST API для взаимодействия с локальной моделью ИИ",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -404,7 +404,7 @@ async def model_info():
 def main():
     """Запуск API сервера."""
     print("="*70)
-    print("LLaMA Local API Server")
+    print("AI Local API Server")
     print("="*70)
     print("\nЗапуск сервера на http://0.0.0.0:8000")
     print("Документация API: http://0.0.0.0:8000/docs")

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-LLaMA Local - главный модуль приложения.
-Запуск локальной квантизированной модели LLaMA на MacOS с Metal поддержкой.
+AI Local - главный модуль приложения.
+Запуск локальной квантизированной модели ИИ на MacOS с Metal поддержкой.
 """
 
 import sys
@@ -50,13 +50,15 @@ class LLaMALocal:
             print("Загрузка конфигурации...")
             self.config_manager = ConfigManager(self.config_path)
             self.config_manager.load()
+
+            self.model_name = self.config_manager._config['active_model']
             
             # Инициализируем логгер
             self.logger = Logger(
-                name="llama_local",
+                name='Local ML logger',
                 level=self.config_manager.app.log_level
             )
-            self.logger.info("LLaMA Local запущен")
+            self.logger.info("Local ML logger запущен")
             self.logger.info(f"Конфигурация загружена из {self.config_path}")
             
             # Инициализируем обработчик сигналов
@@ -102,7 +104,7 @@ class LLaMALocal:
             )
             
             # Загружаем модель
-            print("Загрузка модели LLaMA...")
+            print(f"Загрузка модели {self.model_name}...")
             self.logger.info("Начало загрузки модели")
             self.model_manager.load_model()
             print("Модель успешно загружена!")
@@ -148,7 +150,7 @@ class LLaMALocal:
         
         # Приветственное сообщение
         print("\n" + "="*70)
-        print("LLaMA Local - локальный запуск квантизированных моделей LLaMA")
+        print(f"{self.model_name} Local - локально запущенная модель")
         print("="*70)
         print("\nИнструкции:")
         print("  - Введите промпт и нажмите Ctrl+D для отправки")

@@ -2,13 +2,9 @@
 torch==2.10.0
 transformers==5.0.0
 
-# ML Dependencies
-numpy==2.4.1
-huggingface_hub==1.3.5
-safetensors==0.7.0
-tokenizers==0.22.2
-tqdm==4.67.1
-regex==2026.1.15
+# llama-cpp-python с Metal поддержкой для Apple Silicon
+# Установка с Metal: CMAKE_ARGS="-DLLAMA_METAL=on" pip install llama-cpp-python
+llama-cpp-python>=0.3.0
 
 # Torch dependencies
 sympy==1.14.0

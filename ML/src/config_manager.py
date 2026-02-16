@@ -70,31 +70,57 @@ class ConfigManager:
         if not self._config:
             raise ValueError("Конфигурация пуста")
         
-        if 'download' not in self._config:
-            raise ValueError("Отсутствует секция 'download' в конфигурации")
-        
-        if 'model' not in self._config:
-            raise ValueError("Отсутствует секция 'model' в конфигурации")
-        
+        # Проверяем наличие секции app
         if 'app' not in self._config:
             raise ValueError("Отсутствует секция 'app' в конфигурации")
+
+        # Определяем активную конфигурацию
+        if 'active_model' in self._config and 'models' in self._config:
+            active_model = self._config['active_model']
+            if active_model not in self._config['models']:
+                raise ValueError(f"Активная модель '{active_model}' не найдена в секции 'models'")
+            
+            model_config = self._config['models'][active_model]
+            if 'download' not in model_config:
+                raise ValueError(f"Отсутствует секция 'download' для модели '{active_model}'")
+            if 'model' not in model_config:
+                raise ValueError(f"Отсутствует секция 'model' для модели '{active_model}'")
+                
+            download_section = model_config['download']
+            model_section = model_config['model']
+        else:
+            # Обратная совместимость
+            if 'download' not in self._config:
+                raise ValueError("Отсутствует секция 'download' в конфигурации")
+            if 'model' not in self._config:
+                raise ValueError("Отсутствует секция 'model' в конфигурации")
+                
+            download_section = self._config['download']
+            model_section = self._config['model']
         
         # Проверка обязательных полей загрузки
         required_download_fields = ['repo_id', 'filename', 'auto_download']
         for field in required_download_fields:
-            if field not in self._config['download']:
+            if field not in download_section:
                 raise ValueError(f"Отсутствует обязательное поле 'download.{field}'")
         
         # Проверка обязательных полей модели
         required_model_fields = ['path', 'n_ctx', 'n_gpu_layers']
         for field in required_model_fields:
-            if field not in self._config['model']:
+            if field not in model_section:
                 raise ValueError(f"Отсутствует обязательное поле 'model.{field}'")
     
     def _parse_config(self) -> None:
         """Парсинг конфигурации в dataclass объекты."""
+        # Определяем источник конфигурации
+        if 'active_model' in self._config and 'models' in self._config:
+            active_model = self._config['active_model']
+            source_config = self._config['models'][active_model]
+        else:
+            source_config = self._config
+
         # Парсим конфигурацию загрузки
-        download_cfg = self._config['download']
+        download_cfg = source_config['download']
         self._download_config = DownloadConfig(
             repo_id=download_cfg['repo_id'],
             filename=download_cfg['filename'],
@@ -102,7 +128,7 @@ class ConfigManager:
             token=download_cfg.get('token')
         )
         
-        model_cfg = self._config['model']
+        model_cfg = source_config['model']
         self._model_config = ModelConfig(
             path=model_cfg['path'],
             n_ctx=model_cfg.get('n_ctx', 2048),
