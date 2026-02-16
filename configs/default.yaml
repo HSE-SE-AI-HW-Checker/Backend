@@ -21,3 +21,9 @@ reload: true
 
 # Удаление базы данных при запуске
 drop_db: false
+
+# JWT Authentication settings
+jwt_secret_key: "WbOYKdUjvyFDt1brR3z5Y7DjpOPYkYj0x6K49pm4sLA"
+jwt_algorithm: HS256
+jwt_access_token_expire_minutes: 30
+jwt_refresh_token_expire_days: 7
