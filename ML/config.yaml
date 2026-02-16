@@ -3,9 +3,9 @@
 
 # Активная модель (раскоментируй нужную модель)
 
-# active_model: "deepseek-coder-v2-lite"
+active_model: "deepseek-coder-v2-lite"
 # active_model: "llama-3.1-8b"
-active_model: "mistral-nemo-12b"
+# active_model: "mistral-nemo-12b"
 # active_model: "qwen-2.5-coder-14b"
 # active_model: "qwen-2.5-coder-7b"
 
