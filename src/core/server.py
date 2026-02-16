@@ -337,13 +337,50 @@ class Server:
             """
 
             folder_structure = parse_submitted_data(submitted_data)
-            print(folder_structure)
-            print(folder_structure.get_files_content())
+
+            prompt = """
+You are an expert Senior Software Architect and Code Auditor. Your task is to evaluate a project against a specific set of requirements.
+
+Instructions:
+1. Analyze the provided project structure and file contents.
+2. Read the project requirements carefully.
+3. For EACH requirement, interpret how well the code implements it.
+4. Provide a score from 1 to 10 for each requirement, where 10 is perfect implementation and 1 is completely missing or broken.
+5. Provide a brief justification for the score, referencing specific files or logic.
+
+Output Format:
+You must output a JSON object containing a list of evaluations. Do not include any markdown formatting (like ```json), just the raw JSON.
+
+Example format:
+{
+  "evaluations": [
+    {
+      "requirement_id": 1,
+      "requirement_text": "Must use dependency injection",
+      "score": 8,
+      "justification": "Implemented in services via constructor, but missing in controllers (see main.py)."
+    }
+  ]
+}
+
+Here represents the project data.
+
+<requirements>
+1. Проект должен быть написан на Python 3.10+.
+2. В проекте должна быть модульная архитектура.
+</requirements>
+""" + f"""
+{folder_structure.__str__()}
+
+{folder_structure.get_files_content()}
+
+Based on the code provided above, evaluate the requirements.
+"""
 
             response = requests.post(
                 f'{str(get_ml_server_address())}/generate',
                 json={
-                    "prompt": folder_structure.__str__(),
+                    "prompt": prompt,
                     "temperature": 0.3,
                     "stream": False
                 },

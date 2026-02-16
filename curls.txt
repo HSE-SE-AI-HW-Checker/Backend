@@ -1,0 +1,7 @@
+curl -X POST http://localhost:8080/submit \
+-H "Content-Type: application/json" \
+-H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoyLCJlbWFpbCI6ImFuZHJld0B5YW5kZXgucnUiLCJleHAiOjE3NzEyNjUzODksImlhdCI6MTc3MTI2MzU4OSwidHlwZSI6ImFjY2VzcyJ9.aznOCyiFlxMikkO9GhEvQlbrG_uHJ8TOOYKARMDsNVc" \
+-d '{
+  "data": "https://github.com/BaGGeRTeaMYT/JavaZooHW",
+  "data_type": 0
+}'

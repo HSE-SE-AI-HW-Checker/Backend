@@ -324,7 +324,7 @@ async def generate(request: GenerateRequest):
             
             return GenerateResponse(
                 text=response_text,
-                prompt=request.prompt
+                prompt=''
             )
     
     except HTTPException:

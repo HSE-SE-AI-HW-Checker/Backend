@@ -7,7 +7,7 @@ import bcrypt as bcrypt_lib
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 import jwt
-
+from jwt import encode
 
 # ============================================================================
 # BCRYPT - БЕЗОПАСНОЕ ХЕШИРОВАНИЕ ПАРОЛЕЙ
