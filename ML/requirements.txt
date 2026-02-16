@@ -2,7 +2,7 @@
 
 # llama-cpp-python с Metal поддержкой для Apple Silicon
 # Установка с Metal: CMAKE_ARGS="-DLLAMA_METAL=on" pip install llama-cpp-python
-llama-cpp-python>=0.2.0
+llama-cpp-python>=0.3.0
 
 # Работа с YAML конфигурацией
 PyYAML>=6.0
