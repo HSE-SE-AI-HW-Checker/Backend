@@ -76,7 +76,7 @@ class FolderStructure:
                     build_tree(child_path, new_prefix, is_last_child)
         
         build_tree(self.ROOT_PATH)
-        return '\n'.join(lines)
+        return f"<folder_structure>\n{'\n'.join(lines)}\n</folder_structure>"
 
     def __repr__(self):
         """Возвращает строковое представление для отладки"""
@@ -90,12 +90,9 @@ class FolderStructure:
             file_path: путь к файлу от корня проекта
         """
         if file_path in self.file_contents:
-            print(f"{file_path}")
-            print("=" * 29)
+            print(f"<file name={file_path}>")
             print(self.file_contents[file_path])
-            print("=" * 29)
-        else:
-            print(f"Содержимое файла {file_path} не сохранено")
+            print("</file>")
     
     def print_files_content(self):
         """
@@ -112,20 +109,18 @@ class FolderStructure:
     def get_file_content(self, file_path):
         """
         Возвращает сохраненное содержимое файла в виде строки в формате
-        {file_path}
-        =====================
+        <file name={file_path}>
         {file_content}
-        =====================\n
+        </file>\n
         """
         return f"{file_path}\n{'=' * 40}\n{self.file_contents[file_path]}\n{'=' * 40}\n"
     
     def get_files_content(self):
         """
         Возвращает сохраненное содержимое всех файлов в виде строки в формате
-        {file_path}
-        =====================
+        <file name={file_path}>
         {file_content}
-        =====================\n
+        </file>\n
         ...
         """
         return '\n'.join([self.get_file_content(file_path) for file_path in self.file_contents.keys()])

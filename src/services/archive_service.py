@@ -2,6 +2,7 @@ import base64
 import zipfile
 import tarfile
 import io
+
 from src.services.file_processor import FolderStructure
 
 
@@ -208,9 +209,6 @@ if __name__ == "__main__":
     processor = ArchiveProcessor(whitelist=['.py', '.md'])
     structure = processor.process_base64_archive(base64_archive)
 
-    print("Структура архива:")
     print(structure)
-    print("\n" + "="*50 + "\n")
 
-    print("Содержимое файлов:")
     structure.print_files_content()
