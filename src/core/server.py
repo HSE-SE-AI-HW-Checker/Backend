@@ -337,44 +337,54 @@ class Server:
             """
 
             folder_structure = parse_submitted_data(submitted_data)
+            print(folder_structure.get_files_content())
 
             prompt = """
-You are an expert Senior Software Architect and Code Auditor. Your task is to evaluate a project against a specific set of requirements.
+Ты — Code Auditor и Senior разработчик программного обеспечения. Твоя задача — проверить код проекта и оценить соответствие техническим требованиям. Будь критичен и объективен.
 
-Instructions:
-1. Analyze the provided project structure and file contents.
-2. Read the project requirements carefully.
-3. For EACH requirement, interpret how well the code implements it.
-4. Provide a score from 1 to 10 for each requirement, where 10 is perfect implementation and 1 is completely missing or broken.
-5. Provide a brief justification for the score, referencing specific files or logic.
+# ИНСТРУКЦИИ:
+1. Изучи структуру (<project_structure>) и код файлов (<project_files>).
+2. Для КАЖДОГО требования из <requirements>:
+    a. Найди в коде подтверждение или опровержение выполнения требования.
+    b. Если требование подразумевает подсчет (например, "количество паттернов"), ОБЯЗАТЕЛЬНО перечисли найденные элементы в обосновании.
+    c. Если требование подразумевает формулу, покажи промежуточный расчет.
+    d. Сформируй обоснование (justification). Ссылайся на конкретные файлы и имена функций/классов.
+    e. Выстави оценку (score) от 0 до 10. (Если расчет дает >10, ставь 10).
 
-Output Format:
-You must output a JSON object containing a list of evaluations. Do not include any markdown formatting (like ```json), just the raw JSON.
+# ФОРМАТ ВЫВОДА (Strict JSON):
+Ты должен вывести ТОЛЬКО валидный JSON объект.
+- Экранируй все кавычки внутри строк (например, "text \"quoted\" text").
+- Не используй Markdown блоки (```json).
 
-Example format:
+Пример структуры ответа:
 {
   "evaluations": [
     {
       "requirement_id": 1,
-      "requirement_text": "Must use dependency injection",
-      "score": 8,
-      "justification": "Implemented in services via constructor, but missing in controllers (see main.py)."
+      "requirement_text": "Использование паттернов проектирования. Оценка = 2.5 * (количество уникальных корректно реализованных паттернов). Перечислить найденные паттерны."
+      "score": 5,
+      "justification": "Найдено 2 паттерна: Singleton (db.py) и Factory (utils.py). Расчет: 2.5 * 2 = 5. Паттерн Observer реализован некорректно."
     }
   ]
 }
 
-Here represents the project data.
+# ВХОДНЫЕ ДАННЫЕ:
 
 <requirements>
-1. Проект должен быть написан на Python 3.10+.
-2. В проекте должна быть модульная архитектура.
+1. Основным языком проекта является Python.
+2. Использование паттернов проектирования. Оценка = 2.5 * (количество уникальных корректно реализованных паттернов). Перечислить найденные паттерны.
+3. Соблюдение codestyle.
 </requirements>
 """ + f"""
+<project_structure>
 {folder_structure.__str__()}
+</project_structure>
 
+<project_files>
 {folder_structure.get_files_content()}
+</project_files>
 
-Based on the code provided above, evaluate the requirements.
+Оцени соответствие проекта требованиям, основываясь ТОЛЬКО на коде выше.
 """
 
             response = requests.post(

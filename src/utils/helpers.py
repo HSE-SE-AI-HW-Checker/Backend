@@ -122,7 +122,7 @@ def parse_submitted_data(submitted_data):
     """
     # Ссылка на git подобную штуку
     if submitted_data.data_type == 0:
-        explorer = GitHubRepoExplorer(token="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", whitelist=['.cpp', '.h', '.hpp', '.py', '.txt'])
+        explorer = GitHubRepoExplorer(token="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", whitelist=['.cpp', '.h', '.hpp', '.py', '.txt', '.java'])
         return explorer.get_repo_contents(submitted_data.data)
     # Архив 
     elif submitted_data.data_type == 1:

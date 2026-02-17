@@ -3,10 +3,10 @@
 
 # Активная модель (раскоментируй нужную модель)
 
-active_model: "deepseek-coder-v2-lite"
+# active_model: "deepseek-coder-v2-lite"
 # active_model: "llama-3.1-8b"
 # active_model: "mistral-nemo-12b"
-# active_model: "qwen-2.5-coder-14b"
+active_model: "qwen-2.5-coder-14b"
 # active_model: "qwen-2.5-coder-7b"
 
 models:
@@ -39,13 +39,13 @@ models:
     model:
       path: "./models/DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M.gguf"
       # Если видишь ошибку декодера с кодом -3, уменьшай это значение
-      n_ctx: 20000
+      n_ctx: 19000
       n_gpu_layers: -1
-      temperature: 0.8
+      temperature: 0.3
       top_p: 0.95
       top_k: 50
       repeat_penalty: 1.1
-      max_tokens: 1024
+      max_tokens: 2048
       stream: true
 
   # Mistral Nemo 12B Instruct
