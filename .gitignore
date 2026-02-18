@@ -22,6 +22,7 @@ ENV/
 
 # IDE
 .vscode/
+.vscode
 .idea/
 *.swp
 *.swo
@@ -32,6 +33,5 @@ ENV/
 Thumbs.db
 
 # Test outputs
-tests/output/
-.vscode
-docker_builder/Tinder_sample/*
+tests/output/*.txt
+tests/output/*.log

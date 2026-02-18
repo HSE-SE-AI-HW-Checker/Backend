@@ -5,6 +5,9 @@ FastAPI Dependencies для аутентификации.
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
+import logging
+
+logger = logging.getLogger(__name__)
 
 from ..security.encryptors import decode_token
 from ..core.database_manager import SQLite
@@ -37,7 +40,7 @@ async def get_current_user(
     """
     token = credentials.credentials
 
-    print(f"🔐 [BACKEND] Получен токен: {token[:20]}...")
+    logger.info(f"🔐 [BACKEND] Получен токен: {token[:20]}...")
 
     # Получаем конфигурацию из request (server instance)
     # Конфигурация будет доступна через server instance
@@ -73,14 +76,14 @@ async def get_current_user(
         validation_result = db.validate_token(token)
 
         if not validation_result.get("valid", False):
-            print(f"❌ [BACKEND] Токен невалидный: {validation_result.get('message')}")
+            logging.error(f"❌ [BACKEND] Токен невалидный: {validation_result.get('message')}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=validation_result.get("message", "Токен невалидный"),
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        print(f"✅ [BACKEND] Токен валидный для user_id={user_id}, email={email}")
+        logger.info(f"✅ [BACKEND] Токен валидный для user_id={user_id}, email={email}")
         return {
             "user_id": user_id,
             "email": email,

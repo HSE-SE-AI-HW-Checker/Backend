@@ -1,3 +1,4 @@
+import os
 import requests
 import urllib.parse
 from src.services.file_processor import FolderStructure
@@ -105,8 +106,11 @@ class GitHubRepoExplorer:
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+    
     # Ваш токен GitHub (можно оставить None для публичных репозиториев, но с лимитами)
-    TOKEN = "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"  # замените или оставьте None
+    TOKEN = os.getenv("GITHUB_TOKEN")
 
     # Указываем расширения файлов, содержимое которых нужно сохранить
     WHITELIST = ['.py', '.md', '.txt', '.json', '.yaml', '.yml', '.sty']

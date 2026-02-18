@@ -10,10 +10,12 @@ from tests.utils_for_tests import discover_tests
 TEST_RERUNS=10
 TIME_BEETWEEN_RERUNS=2
 
-def my_print(arg=''):
-    VERBOSE = '-v' in sys.argv
-    if VERBOSE:
-        print(arg)
+import logging
+
+# Настройка логгера
+logging.basicConfig(level=logging.WARNING, format='%(message)s')
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.WARNING)
 
 def run_all_tests():
     """
@@ -22,57 +24,60 @@ def run_all_tests():
     tests = discover_tests(os.path.dirname(os.path.abspath(__file__)))
 
     if not tests:
-        my_print("❌ Тесты не найдены!")
+        logger.error("❌ Тесты не найдены!")
         return 0, 0
     
     passed = 0
     failed = 0
     errors = []
     
-    my_print("=" * 70)
-    my_print("ЗАПУСК ВСЕХ ТЕСТОВ")
-    my_print("=" * 70)
-    my_print(f"Найдено тестов: {len(tests)}")
-    my_print("=" * 70)
-    my_print()
+    logger.info("=" * 70)
+    logger.info("ЗАПУСК ВСЕХ ТЕСТОВ")
+    logger.info("=" * 70)
+    logger.info(f"Найдено тестов: {len(tests)}")
+    logger.info("=" * 70)
+    logger.info("")
     
     for test_name, test_func in tests:
         last_error = None
         for i in range(TEST_RERUNS):
-            my_print(f"\n{'=' * 70}")
-            my_print(f"Тест: {test_name}")
-            my_print('=' * 70)
+            logger.info(f"\n{'=' * 70}")
+            logger.info(f"Тест: {test_name}")
+            logger.info('=' * 70)
 
             try:
                 test_func()
                 passed += 1
-                print(f"✅ {test_name} - ПРОЙДЕН")
+                logger.info(f"✅ {test_name} - ПРОЙДЕН")
                 break
             except Exception as e:
                 last_error = e
         else:
                 failed += 1
                 error_msg = f"❌ {test_name} - ПРОВАЛЕН: {str(last_error)}"
-                print(error_msg)
+                logger.error(error_msg)
                 errors.append(error_msg)
     
     # Итоговая статистика
-    my_print("\n" + "=" * 70)
-    my_print("ИТОГОВАЯ СТАТИСТИКА")
-    my_print("=" * 70)
-    my_print(f"Всего тестов: {len(tests)}")
-    my_print(f"✅ Пройдено: {passed}")
-    my_print(f"❌ Провалено: {failed}")
-    print(f"Процент успеха: {(passed / len(tests) * 100):.1f}%")
+    logger.info("\n" + "=" * 70)
+    logger.info("ИТОГОВАЯ СТАТИСТИКА")
+    logger.info("=" * 70)
+    logger.info(f"Всего тестов: {len(tests)}")
+    logger.info(f"✅ Пройдено: {passed}")
+    logger.info(f"❌ Провалено: {failed}")
+    logger.info(f"Процент успеха: {(passed / len(tests) * 100):.1f}%")
+
+    if failed == 0:
+        print("\033[32m" + 'Ok' + "\033[0m")
     
     if errors:
-        my_print("\n" + "=" * 70)
-        my_print("ОШИБКИ:")
-        my_print("=" * 70)
+        logger.info("\n" + "=" * 70)
+        logger.info("ОШИБКИ:")
+        logger.info("=" * 70)
         for error in errors:
-            my_print(error)
+            logger.error(error)
     
-    my_print("\n" + "=" * 70)
+    logger.info("\n" + "=" * 70)
     
     return passed, failed
 

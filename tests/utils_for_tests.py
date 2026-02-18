@@ -10,12 +10,38 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import importlib
 import inspect
 import uvicorn
+import logging
 from src.core.config_manager import get_from_config
 from src.utils.helpers import MLPath
 
-def my_print(arg=''):
-    if '-v' in sys.argv:
-        print(arg)
+# Настройка логгера
+logger = logging.getLogger(__name__)
+
+def get_auth_headers(client):
+    """
+    Регистрирует пользователя и возвращает заголовки с токеном
+    """
+    sign_up_data = {
+        'username': 'TestUserAuth',
+        'email': 'testuser_auth@example.com',
+        'password': 'securepassword123'
+    }
+    
+    response = client.post("/sign_up", json=sign_up_data)
+    if response.status_code != 200:
+        # Если пользователь уже существует, пробуем войти
+        sign_in_data = {
+            'email': 'testuser_auth@example.com',
+            'password': 'securepassword123'
+        }
+        response = client.post("/sign_in", json=sign_in_data)
+    
+    data = response.json()
+    token = data.get('access_token')
+    
+    return {
+        'Authorization': f'Bearer {token}'
+    }
 
 def discover_tests(tests_dir):
     """
@@ -47,7 +73,7 @@ def discover_tests(tests_dir):
                         tests.append((test_display_name, obj))
                         
             except Exception as e:
-                print(f"⚠️  Не удалось загрузить модуль {module_name}: {e}")
+                logger.error(f"⚠️  Не удалось загрузить модуль {module_name}: {e}")
     
     return tests
 
@@ -58,7 +84,7 @@ def run_server(config_name, server_type='backend'):
     PORT = get_from_config('port', config_name)
     RELOAD = get_from_config('reload', config_name)
 
-    sys.path.append(MLPath())
+    sys.path.append(str(MLPath()))
 
     uvicorn.run(
         "src.main:app",
@@ -96,67 +122,39 @@ def wait_for_server(host, port, timeout=10, check_interval=0.5):
     return False
 
 
+from fastapi.testclient import TestClient
+from src.core.server import Server
+
 def with_test_server(config='testing', server_type='backend', startup_delay=5, max_wait=10):
     """
-    Декоратор для запуска тестового сервера в отдельном процессе
+    Декоратор для запуска тестов с использованием TestClient.
     
     Args:
         config: имя конфигурационного файла
-        startup_delay: начальная задержка в секундах перед проверкой готовности
-        max_wait: максимальное время ожидания готовности сервера
+        server_type: тип сервера (игнорируется в новой реализации)
+        startup_delay: игнорируется
+        max_wait: игнорируется
     
     Использование:
         @with_test_server()
-        def test_my_endpoint():
-            response = requests.get('http://localhost:1234/health')
+        def test_my_endpoint(client):
+            response = client.get('/health')
             assert response.status_code == 200
     """
     def decorator(test_func):
         @wraps(test_func)
         def wrapper(*args, **kwargs):
-            HOST = get_from_config('host', config)
-            PORT = get_from_config('port', config)
+            # Инициализируем сервер
+            server = Server([f'config={config}'])
             
-            # Создаем процесс для запуска сервера
-            server_process = multiprocessing.Process(
-                target=run_server,
-                args=(config, server_type),
-                daemon=True  # Процесс будет автоматически завершен при выходе
-            )
-            
-            try:
-                # Запускаем сервер
-                server_process.start()
-                
-                # Даем серверу начальное время на запуск
-                time.sleep(startup_delay)
-                
-                # Ожидаем готовности сервера
-                if not wait_for_server(HOST, PORT, timeout=max_wait):
-                    raise RuntimeError(
-                        f"Сервер не запустился в течение {max_wait} секунд. "
-                        f"Проверьте конфигурацию и логи."
-                    )
-                
-                my_print(f"✓ Тестовый сервер запущен на http://{HOST}:{PORT}")
+            # Создаем TestClient
+            with TestClient(server.app) as client:
+                # Передаем client в тестовую функцию, если она его ожидает
+                if 'client' in inspect.signature(test_func).parameters:
+                    kwargs['client'] = client
                 
                 # Выполняем тестовую функцию
-                result = test_func(*args, **kwargs)
-                
-                return result
-                
-            finally:
-                # Останавливаем сервер
-                if server_process.is_alive():
-                    server_process.terminate()
-                    server_process.join(timeout=3)
-                    
-                    # Если процесс не завершился, принудительно убиваем его
-                    if server_process.is_alive():
-                        server_process.kill()
-                        server_process.join()
-                
-                my_print("✓ Тестовый сервер остановлен")
+                return test_func(*args, **kwargs)
         
         return wrapper
     return decorator

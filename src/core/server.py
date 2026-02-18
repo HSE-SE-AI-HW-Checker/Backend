@@ -6,10 +6,9 @@ import uvicorn
 import os
 import signal
 import importlib
+from typing import Dict
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from typing import Optional
 from datetime import datetime, timedelta
 import requests
 
@@ -18,6 +17,12 @@ from src.core.config_manager import get_ml_server_address
 from src.models.config import ServerConfig
 from src.services.file_processor import FolderStructure
 from src.security import get_current_user
+from src.core.prompts import get_audit_prompt
+from src.core.constants import DEFAULT_MOCK_RESPONSE
+from src.models.schemas import (
+    User, BasicMessage, LogMessage, SignInResponse, SignUpResponse,
+    LogoutResponse, SubmittedData, ModelResponse
+)
 
 ALIASES = {
     "--port": "port",
@@ -25,58 +30,6 @@ ALIASES = {
     "-H": "host",
     "--host": "host"
 }
-
-
-class User(BaseModel):
-    """Модель пользователя."""
-    username: Optional[str] = None
-    email: str
-    password: str
-
-
-class BasicMessage(BaseModel):
-    """Базовое сообщение."""
-    message: str
-
-
-class LogMessage(BaseModel):
-    """Сообщение для логирования."""
-    message: str
-
-
-class SignInResponse(BaseModel):
-    """Ответ на запрос входа."""
-    message: str
-    error: bool
-    access_token: Optional[str] = None
-    refresh_token: Optional[str] = None
-    token_type: Optional[str] = None
-
-
-class SignUpResponse(BaseModel):
-    """Ответ на запрос регистрации."""
-    message: str
-    error: bool
-    access_token: Optional[str] = None
-    refresh_token: Optional[str] = None
-    token_type: Optional[str] = None
-
-
-class LogoutResponse(BaseModel):
-    """Ответ на запрос выхода."""
-    message: str
-    success: bool
-
-class HomeworkData(BaseModel):
-    """Данные домашнего задания."""
-    data: str
-    data_type: int
-
-class ModelResponse(BaseModel):
-    """Модель ответа для генерации текста (non-streaming)."""
-    
-    text: str = Field(..., description="Сгенерированный текст")
-    prompt: str = Field(..., description="Исходный промпт")
 
 
 class Server:
@@ -324,7 +277,7 @@ class Server:
             }
 
         @self.app.post("/submit", response_model=ModelResponse)
-        async def submit(submitted_data: HomeworkData, current_user: dict = Depends(get_current_user)):
+        async def submit(submitted_data: SubmittedData, current_user: dict = Depends(get_current_user)):
             """
             Отправка домашнего задания (защищенный эндпоинт).
 
@@ -337,55 +290,16 @@ class Server:
             """
 
             folder_structure = parse_submitted_data(submitted_data)
-            print(folder_structure.get_files_content())
+            if not folder_structure:
+                return {
+                    "text": DEFAULT_MOCK_RESPONSE,
+                    "prompt": "Some random prompt"
+                }
 
-            prompt = """
-Ты — Code Auditor и Senior разработчик программного обеспечения. Твоя задача — проверить код проекта и оценить соответствие техническим требованиям. Будь критичен и объективен.
-
-# ИНСТРУКЦИИ:
-1. Изучи структуру (<project_structure>) и код файлов (<project_files>).
-2. Для КАЖДОГО требования из <requirements>:
-    a. Найди в коде подтверждение или опровержение выполнения требования.
-    b. Если требование подразумевает подсчет (например, "количество паттернов"), ОБЯЗАТЕЛЬНО перечисли найденные элементы в обосновании.
-    c. Если требование подразумевает формулу, покажи промежуточный расчет.
-    d. Сформируй обоснование (justification). Ссылайся на конкретные файлы и имена функций/классов.
-    e. Выстави оценку (score) от 0 до 10. (Если расчет дает >10, ставь 10).
-
-# ФОРМАТ ВЫВОДА (Strict JSON):
-Ты должен вывести ТОЛЬКО валидный JSON объект.
-- Экранируй все кавычки внутри строк (например, "text \"quoted\" text").
-- Не используй Markdown блоки (```json).
-
-Пример структуры ответа:
-{
-  "evaluations": [
-    {
-      "requirement_id": 1,
-      "requirement_text": "Использование паттернов проектирования. Оценка = 2.5 * (количество уникальных корректно реализованных паттернов). Перечислить найденные паттерны."
-      "score": 5,
-      "justification": "Найдено 2 паттерна: Singleton (db.py) и Factory (utils.py). Расчет: 2.5 * 2 = 5. Паттерн Observer реализован некорректно."
-    }
-  ]
-}
-
-# ВХОДНЫЕ ДАННЫЕ:
-
-<requirements>
-1. Основным языком проекта является Python.
-2. Использование паттернов проектирования. Оценка = 2.5 * (количество уникальных корректно реализованных паттернов). Перечислить найденные паттерны.
-3. Соблюдение codestyle.
-</requirements>
-""" + f"""
-<project_structure>
-{folder_structure.__str__()}
-</project_structure>
-
-<project_files>
-{folder_structure.get_files_content()}
-</project_files>
-
-Оцени соответствие проекта требованиям, основываясь ТОЛЬКО на коде выше.
-"""
+            prompt = get_audit_prompt(
+                project_structure=folder_structure.__str__(),
+                project_files=folder_structure.get_files_content()
+            )
 
             response = requests.post(
                 f'{str(get_ml_server_address())}/generate',

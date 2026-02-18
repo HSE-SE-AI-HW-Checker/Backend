@@ -76,7 +76,7 @@ class FolderStructure:
                     build_tree(child_path, new_prefix, is_last_child)
         
         build_tree(self.ROOT_PATH)
-        return f"<folder_structure>\n{'\n'.join(lines)}\n</folder_structure>"
+        return "<folder_structure>\n" + '\n'.join(lines) + "\n</folder_structure>"
 
     def __repr__(self):
         """Возвращает строковое представление для отладки"""

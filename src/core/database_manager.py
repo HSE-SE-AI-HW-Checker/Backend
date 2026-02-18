@@ -61,7 +61,7 @@ class SQLite(DB):
         """Инициализация SQLite базы данных."""
         # Используем data/ директорию для хранения БД
         db_path = BackendPath('data/AppUsers.db')
-        self.connection = sqlite3.connect(db_path)
+        self.connection = sqlite3.connect(db_path, check_same_thread=False)
         self.cursor = self.connection.cursor()
 
         # Создание таблицы users
