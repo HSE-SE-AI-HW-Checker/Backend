@@ -37,7 +37,7 @@ python run_server.py config=production
 python run_server.py host=0.0.0.0 port=8080
 ```
 
-Сервер будет доступен по адресу: http://localhost:8000
+Сервер будет доступен по адресу: http://localhost:8080
 
 ## API Endpoints
 
