@@ -1,11 +1,17 @@
 # Конфигурация по умолчанию для production окружения
 # Этот файл содержит настройки для запуска основного сервера
 
-# Реализация логгера
-logger_implementation: SimpleLogger
-
 # Путь к файлу логов
 log_file_path: tmp/Logs.txt
+
+# Режим открытия файла логов
+log_file_mode: a
+
+# Вывод логов в консоль
+log_to_console: true
+
+# Уровень логирования
+log_level: WARNING
 
 # Реализация базы данных
 database_implementation: SQLite
