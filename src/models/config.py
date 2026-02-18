@@ -16,8 +16,9 @@ class ServerConfig:
     Конфигурация сервера приложения.
 
     Attributes:
-        logger_implementation: Имя класса логгера (например, 'SimpleLogger', 'TestingLogger')
         log_file_path: Путь к файлу логов
+        log_file_mode: Режим открытия файла логов ('a' - append, 'w' - write/overwrite)
+        log_to_console: Флаг вывода логов в консоль
         database_implementation: Имя класса реализации БД (например, 'SQLite')
         host: Хост сервера (например, 'localhost', '0.0.0.0')
         port: Порт сервера (1-65535)
@@ -29,16 +30,18 @@ class ServerConfig:
         jwt_refresh_token_expire_days: Время жизни refresh token в днях
     """
     
-    logger_implementation: str
     log_file_path: str
     database_implementation: str
     host: str
     port: int
     reload: bool
     drop_db: bool
-
     # JWT Authentication settings
     jwt_secret_key: str
+    
+    log_file_mode: str = 'a'
+    log_to_console: bool = True
+    log_level: str = 'WARNING'
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 30
     jwt_refresh_token_expire_days: int = 7
@@ -62,12 +65,15 @@ class ServerConfig:
             raise ValueError(f"Порт должен быть в диапазоне 1-65535, получено: {self.port}")
         
         # Валидация строковых полей
-        if not self.logger_implementation or not isinstance(self.logger_implementation, str):
-            raise ValueError("logger_implementation должен быть непустой строкой")
-        
         if not self.log_file_path or not isinstance(self.log_file_path, str):
             raise ValueError("log_file_path должен быть непустой строкой")
         
+        if self.log_file_mode not in ['a', 'w']:
+            raise ValueError("log_file_mode должен быть 'a' или 'w'")
+        
+        if self.log_level not in ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']:
+            raise ValueError(f"log_level должен быть одним из: DEBUG, INFO, WARNING, ERROR, CRITICAL. Получено: {self.log_level}")
+
         if not self.database_implementation or not isinstance(self.database_implementation, str):
             raise ValueError("database_implementation должен быть непустой строкой")
         
@@ -75,6 +81,9 @@ class ServerConfig:
             raise ValueError("host должен быть непустой строкой")
         
         # Валидация булевых полей
+        if not isinstance(self.log_to_console, bool):
+            raise ValueError(f"log_to_console должен быть булевым значением, получено: {type(self.log_to_console).__name__}")
+
         if not isinstance(self.reload, bool):
             raise ValueError(f"reload должен быть булевым значением, получено: {type(self.reload).__name__}")
 
@@ -126,7 +135,7 @@ class ServerConfig:
         
         # Проверка наличия всех обязательных полей
         required_fields = {
-            'logger_implementation', 'log_file_path', 'database_implementation',
+            'log_file_path', 'database_implementation',
             'host', 'port', 'reload', 'drop_db', 'jwt_secret_key'
         }
         missing_fields = required_fields - set(config_data.keys())
@@ -167,8 +176,10 @@ class ServerConfig:
             dict: Словарь с параметрами конфигурации
         """
         return {
-            'logger_implementation': self.logger_implementation,
             'log_file_path': self.log_file_path,
+            'log_file_mode': self.log_file_mode,
+            'log_to_console': self.log_to_console,
+            'log_level': self.log_level,
             'database_implementation': self.database_implementation,
             'host': self.host,
             'port': self.port,
@@ -184,7 +195,6 @@ class ServerConfig:
         """Строковое представление конфигурации."""
         return (
             f"ServerConfig("
-            f"logger={self.logger_implementation}, "
             f"db={self.database_implementation}, "
             f"host={self.host}:{self.port}, "
             f"reload={self.reload}, "

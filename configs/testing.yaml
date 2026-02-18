@@ -1,11 +1,17 @@
 # Конфигурация для тестового окружения
 # Этот файл содержит настройки для запуска тестов
 
-# Реализация логгера для тестов
-logger_implementation: TestingLogger
-
 # Путь к файлу логов тестов
 log_file_path: tests/output/log.txt
+
+# Режим открытия файла логов
+log_file_mode: w
+
+# Вывод логов в консоль
+log_to_console: false
+
+# Уровень логирования
+log_level: WARNING
 
 # Реализация базы данных
 database_implementation: SQLite

@@ -59,8 +59,13 @@ class Server:
         """Инициализация конфигурации, логгера и базы данных."""
         self.config = ServerConfig.from_config_name(self.config)
         
-        logger_class = getattr(importlib.import_module("src.utils.logger"), self.config.logger_implementation)
-        self.logger = logger_class(self.config.log_file_path)
+        from src.utils.logger import Logger
+        self.logger = Logger(
+            relative_file_path=self.config.log_file_path,
+            mode=self.config.log_file_mode,
+            to_console=self.config.log_to_console,
+            log_level=self.config.log_level
+        )
         
         db_class = getattr(importlib.import_module("src.core.database_manager"), self.config.database_implementation)
         if self.config.drop_db:

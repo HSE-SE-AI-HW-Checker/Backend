@@ -1,5 +1,7 @@
-logger_implementation: SimpleLogger
 log_file_path: logs/production.log
+log_file_mode: a
+log_to_console: true
+log_level: WARNING
 database_implementation: SQLite
 host: 0.0.0.0
 port: 8000
