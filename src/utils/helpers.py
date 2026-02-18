@@ -126,7 +126,10 @@ def parse_submitted_data(submitted_data):
     # Ссылка на git подобную штуку
     if submitted_data.data_type == 0:
         try:
-            explorer = GitHubRepoExplorer(token="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", whitelist=['.cpp', '.h', '.hpp', '.py', '.txt', '.java'])
+            from dotenv import load_dotenv
+            load_dotenv()
+            token = os.getenv("GITHUB_TOKEN")
+            explorer = GitHubRepoExplorer(token=token, whitelist=['.cpp', '.h', '.hpp', '.py', '.txt', '.java'])
             return explorer.get_repo_contents(submitted_data.data)
         except Exception:
             return None
