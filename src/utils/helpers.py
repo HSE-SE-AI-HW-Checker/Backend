@@ -120,14 +120,23 @@ def parse_submitted_data(submitted_data):
     Returns:
         Данные в формате, который может обработать ML (скорее всего base64 encoded)
     """
+    # Чтобы не отвравлять сообщение на МЛ сервер
+    if submitted_data.data_type == -1:
+        return None
     # Ссылка на git подобную штуку
     if submitted_data.data_type == 0:
-        explorer = GitHubRepoExplorer(token="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", whitelist=['.cpp', '.h', '.hpp', '.py', '.txt', '.java'])
-        return explorer.get_repo_contents(submitted_data.data)
+        try:
+            explorer = GitHubRepoExplorer(token="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", whitelist=['.cpp', '.h', '.hpp', '.py', '.txt', '.java'])
+            return explorer.get_repo_contents(submitted_data.data)
+        except Exception:
+            return None
     # Архив 
     elif submitted_data.data_type == 1:
-        processor = ArchiveProcessor(whitelist=['.cpp', '.h', '.hpp', '.py', '.txt'])
-        return processor.process_base64_archive(submitted_data.data)
+        try:
+            processor = ArchiveProcessor(whitelist=['.cpp', '.h', '.hpp', '.py', '.txt'])
+            return processor.process_base64_archive(submitted_data.data)
+        except Exception:
+            return None
     # Формат с окошком на каждый файл (обсуждали в личке)
     elif submitted_data.data_type == 2:
         pass

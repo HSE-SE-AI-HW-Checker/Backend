@@ -17,6 +17,35 @@ def my_print(arg=''):
     if '-v' in sys.argv:
         print(arg)
 
+def get_auth_headers(base_url):
+    """
+    Регистрирует пользователя и возвращает заголовки с токеном
+    """
+    sign_up_url = f'{base_url}/sign_up'
+    sign_up_data = {
+        'username': 'TestUserAuth',
+        'email': 'testuser_auth@example.com',
+        'password': 'securepassword123'
+    }
+    
+    response = requests.post(sign_up_url, json=sign_up_data, headers={'Content-Type': 'application/json'})
+    if response.status_code != 200:
+        # Если пользователь уже существует, пробуем войти
+        sign_in_url = f'{base_url}/sign_in'
+        sign_in_data = {
+            'email': 'testuser_auth@example.com',
+            'password': 'securepassword123'
+        }
+        response = requests.post(sign_in_url, json=sign_in_data, headers={'Content-Type': 'application/json'})
+    
+    data = response.json()
+    token = data.get('access_token')
+    
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {token}'
+    }
+
 def discover_tests(tests_dir):
     """
     Автоматическое обнаружение всех тестовых функций
@@ -58,7 +87,7 @@ def run_server(config_name, server_type='backend'):
     PORT = get_from_config('port', config_name)
     RELOAD = get_from_config('reload', config_name)
 
-    sys.path.append(MLPath())
+    sys.path.append(str(MLPath()))
 
     uvicorn.run(
         "src.main:app",

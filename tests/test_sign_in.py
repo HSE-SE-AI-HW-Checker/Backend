@@ -37,7 +37,7 @@ def test_sign_in_success():
         'password': 'securepassword123'
     }
     
-    response = requests.get(sign_in_url, json=sign_in_data, headers=HEADERS)
+    response = requests.post(sign_in_url, json=sign_in_data, headers=HEADERS)
     
     assert response.status_code == 200, f"Ожидался статус 200, получен {response.status_code}"
     my_print("✓ Статус код 200")
@@ -46,7 +46,10 @@ def test_sign_in_success():
     assert 'message' in response_data, "Отсутствует поле 'message' в ответе"
     assert 'error' in response_data, "Отсутствует поле 'error' в ответе"
     assert response_data['error'] == False, "Ожидалось error=False для успешной авторизации"
-    my_print("✓ Авторизация прошла успешно")
+    assert 'access_token' in response_data, "Отсутствует access_token"
+    assert 'refresh_token' in response_data, "Отсутствует refresh_token"
+    assert response_data['token_type'] == 'bearer', "Неверный тип токена"
+    my_print("✓ Авторизация прошла успешно, токены получены")
     
     my_print("\n✅ Тест успешной авторизации пройден!")
 
@@ -75,7 +78,7 @@ def test_sign_in_wrong_password():
         'password': 'wrongpassword'
     }
     
-    response = requests.get(sign_in_url, json=sign_in_data, headers=HEADERS)
+    response = requests.post(sign_in_url, json=sign_in_data, headers=HEADERS)
     
     assert response.status_code == 200, f"Ожидался статус 200, получен {response.status_code}"
     my_print("✓ Статус код 200")
@@ -99,7 +102,7 @@ def test_sign_in_nonexistent_user():
         'password': 'anypassword'
     }
     
-    response = requests.get(sign_in_url, json=sign_in_data, headers=HEADERS)
+    response = requests.post(sign_in_url, json=sign_in_data, headers=HEADERS)
     
     assert response.status_code == 200, f"Ожидался статус 200, получен {response.status_code}"
     my_print("✓ Статус код 200")

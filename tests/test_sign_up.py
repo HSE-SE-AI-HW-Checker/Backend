@@ -24,8 +24,14 @@ def test_sign_up():
         assert response.status_code == 200
         my_print("✓ Статус код 200")
 
-        assert response.json() == {'message': 'Пользователь зарегистрирован', 'error': False}
-        my_print("✓ Ответ сервера корректен")
+        response_data = response.json()
+        assert response_data['message'] == 'Пользователь зарегистрирован'
+        assert response_data['error'] is False
+        assert 'access_token' in response_data
+        assert 'refresh_token' in response_data
+        assert 'token_type' in response_data
+        assert response_data['token_type'] == 'bearer'
+        my_print("✓ Ответ сервера корректен, токены получены")
         
         my_print("\n✅ Все тесты пройдены успешно!")
 

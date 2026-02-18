@@ -5,12 +5,11 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import requests
 from src.core.config_manager import get_url_from_config
-from tests.utils_for_tests import with_test_server, my_print
+from tests.utils_for_tests import with_test_server, my_print, get_auth_headers
 
 CONFIG = 'testing'
 
 BASE_URL = get_url_from_config(CONFIG)
-HEADERS = {'Content-Type': 'application/json'}
 
 
 @with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
@@ -21,7 +20,8 @@ def test_log_endpoint():
     url = f'{BASE_URL}/log'
     data = {'message': 'Тестовое сообщение для логирования'}
     
-    response = requests.post(url, json=data, headers=HEADERS)
+    headers = get_auth_headers(BASE_URL)
+    response = requests.post(url, json=data, headers=headers)
     
     assert response.status_code == 200, f"Ожидался статус 200, получен {response.status_code}"
     my_print("✓ Статус код 200")
@@ -42,7 +42,8 @@ def test_log_endpoint_empty_message():
     url = f'{BASE_URL}/log'
     data = {'message': ''}
     
-    response = requests.post(url, json=data, headers=HEADERS)
+    headers = get_auth_headers(BASE_URL)
+    response = requests.post(url, json=data, headers=headers)
     
     assert response.status_code == 200, f"Ожидался статус 200, получен {response.status_code}"
     my_print("✓ Статус код 200 для пустого сообщения")
@@ -63,7 +64,8 @@ def test_log_endpoint_long_message():
     long_message = 'A' * 1000  # Длинное сообщение из 1000 символов
     data = {'message': long_message}
     
-    response = requests.post(url, json=data, headers=HEADERS)
+    headers = get_auth_headers(BASE_URL)
+    response = requests.post(url, json=data, headers=headers)
     
     assert response.status_code == 200, f"Ожидался статус 200, получен {response.status_code}"
     my_print("✓ Статус код 200 для длинного сообщения")
