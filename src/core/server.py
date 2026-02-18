@@ -9,8 +9,6 @@ import importlib
 from typing import Dict
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from typing import Optional
 from datetime import datetime, timedelta
 import requests
 
@@ -21,6 +19,10 @@ from src.services.file_processor import FolderStructure
 from src.security import get_current_user
 from src.core.prompts import get_audit_prompt
 from src.core.constants import DEFAULT_MOCK_RESPONSE
+from src.models.schemas import (
+    User, BasicMessage, LogMessage, SignInResponse, SignUpResponse,
+    LogoutResponse, SubmittedData, ModelResponse
+)
 
 ALIASES = {
     "--port": "port",
@@ -28,60 +30,6 @@ ALIASES = {
     "-H": "host",
     "--host": "host"
 }
-
-
-class User(BaseModel):
-    """Модель пользователя."""
-    username: Optional[str] = None
-    email: str
-    password: str
-
-
-class BasicMessage(BaseModel):
-    """Базовое сообщение."""
-    message: str
-
-
-class LogMessage(BaseModel):
-    """Сообщение для логирования."""
-    message: str
-
-
-class SignInResponse(BaseModel):
-    """Ответ на запрос входа."""
-    message: str
-    error: bool
-    access_token: Optional[str] = None
-    refresh_token: Optional[str] = None
-    token_type: Optional[str] = None
-
-
-class SignUpResponse(BaseModel):
-    """Ответ на запрос регистрации."""
-    message: str
-    error: bool
-    access_token: Optional[str] = None
-    refresh_token: Optional[str] = None
-    token_type: Optional[str] = None
-
-
-class LogoutResponse(BaseModel):
-    """Ответ на запрос выхода."""
-    message: str
-    success: bool
-
-class SubmittedData(BaseModel):
-    """Данные домашнего задания."""
-    data: str
-    # текст требования, тип требования (нужен ли мл для проверки?)
-    requirements: Dict[str, int]
-    data_type: int
-
-class ModelResponse(BaseModel):
-    """Модель ответа для генерации текста (non-streaming)."""
-    
-    text: str = Field(..., description="Сгенерированный текст")
-    prompt: str = Field(..., description="Исходный промпт")
 
 
 class Server:
