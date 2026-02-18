@@ -25,7 +25,7 @@
 
 1. Запустите API сервер:
 ```bash
-cd llama_local
+cd ML
 python api_server.py
 ```
 
@@ -47,20 +47,6 @@ python api_server.py
 
 **Content-Type:** `application/json`
 
-**Тело запроса:**
-
-```json
-{
-  "prompt": "Что такое машинное обучение?",
-  "temperature": 0.7,
-  "max_tokens": 512,
-  "top_p": 0.9,
-  "top_k": 40,
-  "repeat_penalty": 1.1,
-  "stream": true
-}
-```
-
 **Параметры:**
 
 | Параметр | Тип | Обязательный | Описание | Диапазон |
@@ -72,27 +58,6 @@ python api_server.py
 | `top_k` | integer | Нет | Top-K sampling | 1 - 100 |
 | `repeat_penalty` | float | Нет | Штраф за повторения | 1.0 - 2.0 |
 | `stream` | boolean | Нет | Использовать streaming режим | true/false (по умолчанию: true) |
-
-**Ответ (non-streaming):**
-
-```json
-{
-  "text": "Машинное обучение - это раздел искусственного интеллекта...",
-  "prompt": "Что такое машинное обучение?"
-}
-```
-
-**Ответ (streaming):**
-
-Server-Sent Events (SSE) формат:
-```
-data: Машинное
-data:  обучение
-data:  -
-data:  это
-...
-data: [DONE]
-```
 
 **Коды ответа:**
 
