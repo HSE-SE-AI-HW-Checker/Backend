@@ -40,3 +40,7 @@ setuptools==80.10.2
 shellingham==1.5.4
 annotated-doc==0.0.4
 typer-slim==0.21.1
+
+# Authentication
+PyJWT==2.8.0
+bcrypt==4.1.2
