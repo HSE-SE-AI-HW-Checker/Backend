@@ -6,6 +6,7 @@ import uvicorn
 import os
 import signal
 import importlib
+from typing import Dict
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -18,6 +19,8 @@ from src.core.config_manager import get_ml_server_address
 from src.models.config import ServerConfig
 from src.services.file_processor import FolderStructure
 from src.security import get_current_user
+from src.core.prompts import get_audit_prompt
+from src.core.constants import DEFAULT_MOCK_RESPONSE
 
 ALIASES = {
     "--port": "port",
@@ -67,9 +70,11 @@ class LogoutResponse(BaseModel):
     message: str
     success: bool
 
-class HomeworkData(BaseModel):
+class SubmittedData(BaseModel):
     """Данные домашнего задания."""
     data: str
+    # текст требования, тип требования (нужен ли мл для проверки?)
+    requirements: Dict[str, int]
     data_type: int
 
 class ModelResponse(BaseModel):
@@ -324,7 +329,7 @@ class Server:
             }
 
         @self.app.post("/submit", response_model=ModelResponse)
-        async def submit(submitted_data: HomeworkData, current_user: dict = Depends(get_current_user)):
+        async def submit(submitted_data: SubmittedData, current_user: dict = Depends(get_current_user)):
             """
             Отправка домашнего задания (защищенный эндпоинт).
 
@@ -337,63 +342,16 @@ class Server:
             """
 
             folder_structure = parse_submitted_data(submitted_data)
-            print(folder_structure.get_files_content())
+            if not folder_structure:
+                return {
+                    "text": DEFAULT_MOCK_RESPONSE,
+                    "prompt": "Some random prompt"
+                }
 
-            prompt = f"""
-Ты — строгий Code Auditor и Senior Python Developer. Твоя задача — проверить код студенческого проекта и оценить его соответствие требованиям.
-
-# РОЛЬ И ЦЕЛЬ:
-Ты должен проанализировать предоставленный код и выставить оценки по критериям. Твои оценки должны быть объективными, а комментарии — конструктивными и ссылаться на конкретные части кода.
-
-# ИНСТРУКЦИИ ПО АНАЛИЗУ:
-1. Внимательно изучи структуру проекта (<project_structure>) и содержимое файлов (<project_files>).
-2. Пройдись по каждому пункту из списка требований (<requirements>).
-3. Для каждого требования:
-    - Найди доказательства выполнения или невыполнения в коде.
-    - Если требование подразумевает количественную оценку (например, "2.5 балла за каждый паттерн"), проведи расчет.
-    - Сформулируй обоснование (justification), указывая конкретные файлы, классы, функции и, по возможности, номера строк.
-    - Дай рекомендации по улучшению (suggestions), если оценка не максимальная.
-    - Выстави оценку (score) от 0 до 10.
-
-# ТРЕБОВАНИЯ К ВЫВОДУ (JSON):
-- Твой ответ должен быть ИСКЛЮЧИТЕЛЬНО валидным JSON объектом.
-- НЕ пиши никаких вступительных слов, не используй markdown-блоки (```json).
-- Структура JSON должна строго соответствовать примеру ниже.
-
-Пример JSON ответа:
-{{
-  "evaluations": [
-    {{
-      "requirement_id": 1,
-      "requirement_text": "Использование паттернов проектирования...",
-      "score": 5,
-      "max_score": 10,
-      "justification": "Обнаружен паттерн Singleton в файле src/db.py (класс Database). Паттерн Factory в src/utils.py реализован с ошибкой (нарушен принцип OCP).",
-      "suggestions": "Рекомендуется исправить реализацию Factory, используя абстрактный базовый класс."
-    }}
-  ],
-  "total_score": 5,
-  "general_feedback": "Проект имеет хорошую структуру, но требует доработки в части архитектурных паттернов."
-}}
-
-# ВХОДНЫЕ ДАННЫЕ:
-
-<requirements>
-1. Язык программирования: Проект должен быть написан преимущественно на Python. (Оценка 10, если Python, 0 если нет).
-2. Архитектура и Паттерны: Оценка = 2.5 балла за каждый уникальный, корректно реализованный паттерн проектирования (Singleton, Factory, Observer, Strategy, Decorator и др.). Максимум 10 баллов. В обосновании перечислить найденные паттерны и файлы.
-3. Качество кода (PEP8): Код должен быть чистым, читаемым и следовать рекомендациям PEP8. Оценивай нейминг переменных, наличие docstring-ов, типизацию (type hints).
-</requirements>
-
-<project_structure>
-{folder_structure.__str__()}
-</project_structure>
-
-<project_files>
-{folder_structure.get_files_content()}
-</project_files>
-
-Оцени соответствие проекта требованиям, основываясь ТОЛЬКО на коде выше.
-"""
+            prompt = get_audit_prompt(
+                project_structure=folder_structure.__str__(),
+                project_files=folder_structure.get_files_content()
+            )
 
             response = requests.post(
                 f'{str(get_ml_server_address())}/generate',
