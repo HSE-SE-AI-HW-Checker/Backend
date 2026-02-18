@@ -13,6 +13,7 @@ def get_audit_prompt(project_structure: str, project_files: str) -> str:
     Returns:
         str: Сформированный промпт.
     """
+
     return f"""
 Ты — строгий Code Auditor и Senior Python Developer. Твоя задача — проверить код студенческого проекта и оценить его соответствие требованиям.
 
