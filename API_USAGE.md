@@ -24,6 +24,16 @@ python run_server.py config=production
 python run_server.py host=0.0.0.0 port=8080 reload=true
 ```
 
+## Аутентификация
+
+API использует JWT (JSON Web Tokens) для аутентификации.
+При успешной регистрации или входе возвращается пара токенов: `access_token` и `refresh_token`.
+
+Для доступа к защищенным эндпоинтам необходимо передавать `access_token` в заголовке `Authorization`:
+```
+Authorization: Bearer <your_access_token>
+```
+
 ## API Endpoints
 
 ### Health Check
@@ -92,7 +102,10 @@ python run_server.py host=0.0.0.0 port=8080 reload=true
 ```json
 {
   "message": "Пользователь зарегистрирован",
-  "error": false
+  "error": false,
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer"
 }
 ```
 
@@ -121,35 +134,56 @@ python run_server.py host=0.0.0.0 port=8080 reload=true
 ```json
 {
   "message": "",
-  "error": false
+  "error": false,
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer"
 }
 ```
 
-**Response (Error - Email not found):**
+### User Profile (Protected)
+Получение профиля текущего пользователя.
+
+**Endpoint:** `GET /me`
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
 ```json
 {
-  "message": "Почта john@example.com не зарегистрирована",
-  "error": true
+  "user_id": 1,
+  "email": "john@example.com",
+  "username": "john_doe"
 }
 ```
 
-**Response (Error - Wrong password):**
+### Logout (Protected)
+Выход из системы (отзыв токена).
+
+**Endpoint:** `POST /logout`
+**Headers:** `Authorization: Bearer <token>`
+
+**Response:**
 ```json
 {
-  "message": "Неверный пароль",
-  "error": true
+  "message": "Выход выполнен",
+  "success": true
 }
 ```
 
-### Submit Homework
+### Submit Homework (Protected)
 Отправка домашнего задания на проверку.
 
 **Endpoint:** `POST /submit`
+**Headers:** `Authorization: Bearer <token>`
 
 **Request Body:**
 ```json
 {
-  "data": "Содержимое домашнего задания",
+  "data": "https://github.com/user/homework",
+  "requirements": {
+    "Check code style": 1,
+    "Check logic": 1
+  },
   "data_type": 0
 }
 ```
@@ -161,6 +195,12 @@ python run_server.py host=0.0.0.0 port=8080 reload=true
 
 **Response:**
 Ответ от ML сервера с результатами проверки.
+```json
+{
+  "text": "Результат проверки...",
+  "prompt": "Использованный промпт..."
+}
+```
 
 ## Примеры использования
 
@@ -168,9 +208,7 @@ python run_server.py host=0.0.0.0 port=8080 reload=true
 ```python
 import requests
 
-# Health check
-response = requests.get('http://localhost:8000/health')
-print(response.json())
+BASE_URL = 'http://localhost:8000'
 
 # Регистрация
 user_data = {
@@ -178,32 +216,36 @@ user_data = {
     "email": "john@example.com",
     "password": "secure_password"
 }
-response = requests.post('http://localhost:8000/sign_up', json=user_data)
-print(response.json())
+response = requests.post(f'{BASE_URL}/sign_up', json=user_data)
+tokens = response.json()
+access_token = tokens.get('access_token')
+print("Tokens:", tokens)
 
-# Авторизация
-login_data = {
-    "email": "john@example.com",
-    "password": "secure_password"
+# Получение профиля
+headers = {'Authorization': f'Bearer {access_token}'}
+response = requests.get(f'{BASE_URL}/me', headers=headers)
+print("Profile:", response.json())
+
+# Отправка задания
+submit_data = {
+    "data": "https://github.com/user/homework",
+    "requirements": {"style": 1},
+    "data_type": 0
 }
-response = requests.post('http://localhost:8000/sign_in', json=login_data)
-print(response.json())
+response = requests.post(f'{BASE_URL}/submit', json=submit_data, headers=headers)
+print("Result:", response.json())
 ```
 
 ### cURL
 ```bash
-# Health check
-curl http://localhost:8000/health
-
-# Регистрация
+# Регистрация и получение токена
 curl -X POST http://localhost:8000/sign_up \
   -H "Content-Type: application/json" \
   -d '{"username":"john_doe","email":"john@example.com","password":"secure_password"}'
 
-# Авторизация
-curl -X POST http://localhost:8000/sign_in \
-  -H "Content-Type: application/json" \
-  -d '{"email":"john@example.com","password":"secure_password"}'
+# Использование токена
+curl http://localhost:8000/me \
+  -H "Authorization: Bearer <YOUR_ACCESS_TOKEN>"
 ```
 
 ## Конфигурация
@@ -216,42 +258,9 @@ curl -X POST http://localhost:8000/sign_in \
 
 Активная конфигурация: `config.yaml` в корне проекта.
 
-### Параметры конфигурации
-
-```yaml
-logger_implementation: SimpleLogger  # Класс логгера
-log_file_path: logs/server.log      # Путь к файлу логов
-database_implementation: SQLite      # Класс БД
-host: localhost                      # Хост сервера
-port: 8000                          # Порт сервера
-reload: true                        # Автоперезагрузка
-drop_db: false                      # Удалять БД при запуске
-```
-
 ## Интерактивная документация
 
 После запуска сервера доступна автоматическая документация:
 
 - **Swagger UI:** http://localhost:8000/docs
 - **ReDoc:** http://localhost:8000/redoc
-
-## Troubleshooting
-
-### Порт уже занят
-```bash
-# Используйте другой порт
-python run_server.py port=8001
-```
-
-### База данных заблокирована
-```bash
-# Удалите файл БД и перезапустите
-rm data/AppUsers.db
-python run_server.py
-```
-
-### Проблемы с импортами
-```bash
-# Убедитесь, что вы в корневой директории Backend
-cd Backend
-python run_server.py
