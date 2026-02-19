@@ -261,6 +261,7 @@ async def generate(request: GenerateRequest):
     В streaming режиме возвращает Server-Sent Events.
     В non-streaming режиме возвращает полный ответ в JSON.
     """
+    logger.info("Получен запрос на /generate.")
     try:
         if not model_manager or not model_manager.is_loaded():
             raise HTTPException(

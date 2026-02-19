@@ -306,6 +306,7 @@ class Server:
                 }
 
             prompt = get_audit_prompt(
+                submitted_data.requirements,
                 project_structure=folder_structure.__str__(),
                 project_files=folder_structure.get_files_content()
             )

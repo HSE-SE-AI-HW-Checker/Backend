@@ -1,6 +1,6 @@
 logger_implementation: SimpleLogger
 log_file_path: logs/server.log
-database_implementation: SQLite
+database_implementation: SQLAlchemyDB
 host: localhost
 port: 8000
 reload: true
