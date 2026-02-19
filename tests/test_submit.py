@@ -3,12 +3,9 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tests.utils_for_tests import with_test_server, logger, get_auth_headers
-
-CONFIG = 'testing'
+from tests.utils_for_tests import logger, get_auth_headers
 
 
-@with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
 def test_submit_git_link(client):
     """
     Тест отправки данных типа 0 (ссылка на git)
@@ -33,7 +30,6 @@ def test_submit_git_link(client):
     logger.info("\n✅ Тест отправки git ссылки пройден успешно!")
 
 
-@with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
 def test_submit_archive(client):
     """
     Тест отправки данных типа 1 (архив)
@@ -58,7 +54,6 @@ def test_submit_archive(client):
     logger.info("\n✅ Тест отправки архива пройден успешно!")
 
 
-@with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
 def test_submit_file_format(client):
     """
     Тест отправки данных типа 2 (формат с окошком на каждый файл)
@@ -83,7 +78,6 @@ def test_submit_file_format(client):
     logger.info("\n✅ Тест отправки файлового формата пройден успешно!")
 
 
-@with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
 def test_submit_unknown_type(client):
     """
     Тест отправки данных с неизвестным типом
@@ -108,7 +102,6 @@ def test_submit_unknown_type(client):
     logger.info("\n✅ Тест отправки неизвестного типа данных пройден успешно!")
 
 
-@with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
 def test_submit_empty_data(client):
     """
     Тест отправки пустых данных

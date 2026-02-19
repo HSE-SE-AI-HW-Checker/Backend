@@ -48,10 +48,13 @@ async def get_current_user(
         # Пытаемся получить server instance из app.state
         server = request.app.state.server
         config = server.config
+        db = server.db
     except AttributeError:
         # Если не получилось, используем default значения
         from ..models.config import ServerConfig
+        from ..core.database_manager import SQLite
         config = ServerConfig.from_config_name('default')
+        db = SQLite()
 
     try:
         # Декодируем токен
@@ -72,7 +75,6 @@ async def get_current_user(
             )
 
         # Проверяем токен в БД
-        db = SQLite()
         validation_result = db.validate_token(token)
 
         if not validation_result.get("valid", False):

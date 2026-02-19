@@ -3,13 +3,11 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tests.utils_for_tests import with_test_server, logger
+from tests.utils_for_tests import logger
 
-CONFIG = 'testing'
 
 DATA = {'username': 'Andrew', 'email': 'andrew@gmail.com', 'password': '123456'}
 
-@with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
 def test_sign_up(client):
     """
     Тест регистрации пользователя

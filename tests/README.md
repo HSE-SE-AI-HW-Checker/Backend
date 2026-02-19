@@ -1,24 +1,10 @@
 # Тестирование сервера
 
-## Декоратор `@with_test_server`
-
-Для удобного тестирования HTTP эндпоинтов создан декоратор `@with_test_server`, который автоматически запускает тестовый сервер в отдельном процессе перед выполнением теста и останавливает его после завершения.
-
-### Преимущества использования multiprocessing
-
-Декоратор использует `multiprocessing` вместо `threading`, что решает проблему с SQLite:
-- Каждый процесс имеет свое собственное соединение к базе данных
-- Нет конфликтов при работе с SQLite из разных потоков
-- Полная изоляция тестовой среды
-
 ### Использование
 
 ```python
-from test_utils import with_test_server
-
-@with_test_server(config='testing_config.json', startup_delay=3)
-def test_my_endpoint():
-    response = requests.get('http://localhost:1234/health')
+def test_my_endpoint(client):
+    response = client.get('/health')
     assert response.status_code == 200
 ```
 

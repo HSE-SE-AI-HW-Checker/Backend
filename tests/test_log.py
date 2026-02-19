@@ -3,12 +3,9 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tests.utils_for_tests import with_test_server, logger, get_auth_headers
-
-CONFIG = 'testing'
+from tests.utils_for_tests import logger, get_auth_headers
 
 
-@with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
 def test_log_endpoint(client):
     """
     Тест эндпоинта записи сообщения в лог
@@ -29,7 +26,6 @@ def test_log_endpoint(client):
     logger.info("\n✅ Все тесты log endpoint пройдены успешно!")
 
 
-@with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
 def test_log_endpoint_empty_message(client):
     """
     Тест эндпоинта записи пустого сообщения в лог
@@ -49,7 +45,6 @@ def test_log_endpoint_empty_message(client):
     logger.info("\n✅ Тест пустого сообщения пройден успешно!")
 
 
-@with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
 def test_log_endpoint_long_message(client):
     """
     Тест эндпоинта записи длинного сообщения в лог

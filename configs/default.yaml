@@ -14,7 +14,8 @@ log_to_console: true
 log_level: WARNING
 
 # Реализация базы данных
-database_implementation: SQLite
+database_implementation: SQLAlchemyDB
+database_url: sqlite:///data/AppUsers.db
 
 # Хост сервера
 host: localhost

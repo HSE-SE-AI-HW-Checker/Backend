@@ -70,7 +70,11 @@ class Server:
         db_class = getattr(importlib.import_module("src.core.database_manager"), self.config.database_implementation)
         if self.config.drop_db:
             db_class.drop()
-        self.db = db_class()
+        
+        if self.config.database_implementation == "SQLAlchemyDB" and self.config.database_url:
+            self.db = db_class(self.config.database_url)
+        else:
+            self.db = db_class()
         
         self.app = FastAPI()
         self.app.add_middleware(
