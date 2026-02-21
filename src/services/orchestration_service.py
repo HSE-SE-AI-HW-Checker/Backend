@@ -13,12 +13,13 @@ MOCK_RESPONSE = {
   "prompt" :""
 }
 
+
 class BigBoss:
   def __init__(self, url):
     self.url = url
     self.prompt_cnt = 0
 
-  def _get_answer(self, prompt: str, temperature: float = 0.2) -> Dict[str, Any]:
+  def _get_answer(self, prompt: str, max_tokens: int = 1024, temperature: float = 0.2) -> Dict[str, Any]:
     try:
       self.prompt_cnt += 1
       with open(f'logs/prompt{self.prompt_cnt}', 'w') as f:
@@ -29,6 +30,7 @@ class BigBoss:
           "prompt": prompt,
           "temperature": temperature,
           "stream": False,
+          "max_tokens": max_tokens,
         },
         headers={'Content-Type': 'application/json'},
       )
@@ -37,6 +39,8 @@ class BigBoss:
       logger.error(f'HTTP request failed {e}.')
       return MOCK_RESPONSE
     
-  def forward(self, requirements: str, project: FolderStructure) -> Dict[str, Any]:
-    processed_reqs = self._get_answer(get_orchestrator_prompt(requirements))
+  
+    
+  def audit(self, requirements: str, project: FolderStructure) -> Dict[str, Any]:
+    processed_reqs = self._get_answer(get_orchestrator_prompt(requirements), max_tokens=1024)
     return processed_reqs

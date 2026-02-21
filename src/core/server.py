@@ -300,16 +300,16 @@ class Server:
             """
 
             boss = BigBoss(get_ml_server_address())
-            folder_structure = parse_submitted_data(submitted_data)
-            if not folder_structure:
+            project_data = parse_submitted_data(submitted_data)
+            if not project_data:
                 return {
                     "text": DEFAULT_MOCK_RESPONSE,
                     "prompt": "Some random prompt"
                 }
 
-            response = boss(submitted_data.requirements)
+            response = boss.audit(submitted_data.requirements, project_data)
 
-            return response.json()
+            return response
 
     def run(self):
         """Запустить сервер."""

@@ -88,7 +88,8 @@ class ModelManager:
                 "top_p": self.config.top_p,
                 "top_k": self.config.top_k,
                 "repeat_penalty": self.config.repeat_penalty,
-                "stream": self.config.stream
+                "stream": self.config.stream,
+                "stop": getattr(self.config, 'stop', [])
             }
             
             # Генерируем ответ

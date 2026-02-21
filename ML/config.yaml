@@ -77,7 +77,7 @@ models:
     model:
       path: "./models/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf"
       # Если видишь ошибку декодера с кодом -3, уменьшай это значение
-      n_ctx: 16384
+      n_ctx: 19000
       n_gpu_layers: -1
       temperature: 0.2
       top_p: 0.95
@@ -96,7 +96,7 @@ models:
     model:
       path: "./models/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf"
       # Если видишь ошибку декодера с кодом -3, уменьшай это значение
-      n_ctx: 16384
+      n_ctx: 19000
       n_gpu_layers: -1
       temperature: 0.2
       top_p: 0.95

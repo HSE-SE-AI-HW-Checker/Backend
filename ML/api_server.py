@@ -39,6 +39,7 @@ class GenerateRequest(BaseModel):
     top_p: Optional[float] = Field(None, description="Top-p sampling (0.0-1.0)", ge=0.0, le=1.0)
     top_k: Optional[int] = Field(None, description="Top-k sampling", ge=1, le=100)
     repeat_penalty: Optional[float] = Field(None, description="Штраф за повторения (1.0-2.0)", ge=1.0, le=2.0)
+    stop: Optional[list[str]] = Field(None, description="Список стоп-слов")
     stream: bool = Field(True, description="Использовать streaming режим")
     
     @validator('prompt')
@@ -215,6 +216,8 @@ async def generate_stream(prompt: str, params: dict) -> AsyncIterator[str]:
             temp_config.top_k = params['top_k']
         if params.get('repeat_penalty') is not None:
             temp_config.repeat_penalty = params['repeat_penalty']
+        if params.get('stop') is not None:
+            temp_config.stop = params['stop']
         
         # Включаем streaming
         temp_config.stream = True
@@ -278,6 +281,7 @@ async def generate(request: GenerateRequest):
             'top_p': request.top_p,
             'top_k': request.top_k,
             'repeat_penalty': request.repeat_penalty,
+            'stop': request.stop,
         }
         
         if request.stream:
@@ -309,6 +313,8 @@ async def generate(request: GenerateRequest):
                 temp_config.top_k = params['top_k']
             if params.get('repeat_penalty') is not None:
                 temp_config.repeat_penalty = params['repeat_penalty']
+            if params.get('stop') is not None:
+                temp_config.stop = params['stop']
             
             # Отключаем streaming
             temp_config.stream = False
@@ -416,7 +422,7 @@ def main():
         host="0.0.0.0",
         port=8000,
         log_level="info",
-        reload=False
+        reload=True
     )
 
 

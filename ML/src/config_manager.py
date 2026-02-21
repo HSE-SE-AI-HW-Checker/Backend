@@ -30,6 +30,7 @@ class ModelConfig:
     repeat_penalty: float
     max_tokens: int
     stream: bool
+    stop: list[str]
 
 
 @dataclass
@@ -138,7 +139,8 @@ class ConfigManager:
             top_k=model_cfg.get('top_k', 40),
             repeat_penalty=model_cfg.get('repeat_penalty', 1.1),
             max_tokens=model_cfg.get('max_tokens', 512),
-            stream=model_cfg.get('stream', True)
+            stream=model_cfg.get('stream', True),
+            stop=model_cfg.get('stop', [])
         )
         
         app_cfg = self._config['app']

@@ -6,8 +6,7 @@ data/*.db
 *.log
 Logs.txt
 log.txt
-logs/*.log
-logs/*.txt
+logs/*
 
 # Python cache
 __pycache__/
