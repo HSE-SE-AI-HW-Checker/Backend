@@ -5,11 +5,6 @@ import datetime
 def send_submit_request():
     url = "http://localhost:8080/"
     
-    # Токен из вашего примера
-
-
-    # token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoyLCJlbWFpbCI6ImFuZHJld0B5YW5kZXgucnUiLCJleHAiOjE3NzEyNzAwNzIsImlhdCI6MTc3MTI2ODI3MiwidHlwZSI6ImFjY2VzcyJ9.6h08B_NrjgWZ3CJxcE3mEgRMDxujaMa6ggXRMMUCaZc"
-    
     headers = {
         "Content-Type": "application/json"
     }
@@ -39,12 +34,13 @@ def send_submit_request():
 
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {token}"
+        "Authorization": f"Bearer {token}",
     }
 
     payload = {
         "data": "https://github.com/BaGGeRTeaMYT/JavaZooHW",
-        "data_type": 0
+        "requirements": {"1. Проект написан на Java": 0},
+        "data_type": 0,
     }
     
     try:

@@ -7,15 +7,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.core.server import Server
 from tests.utils_for_tests import logger
 
-# Инициализируем сервер с тестовой конфигурацией
-# Важно: создаем новый экземпляр сервера для каждого запуска теста,
-# чтобы избежать проблем с закрытыми соединениями БД
-def get_client():
-    server = Server(['config=testing'])
-    return TestClient(server.app)
 
-def test_me_endpoint():
-    client = get_client()
+def test_me_endpoint(client):
     """
     Тест эндпоинта /me с использованием TestClient
     """
@@ -60,4 +53,8 @@ def test_me_endpoint():
     logger.info("\n✅ Тест /me пройден успешно!")
 
 if __name__ == "__main__":
-    test_me_endpoint()
+    # Для запуска напрямую нужно создать клиент вручную
+    from src.core.server import Server
+    server = Server(['config=testing'])
+    with TestClient(server.app) as client:
+        test_me_endpoint(client)

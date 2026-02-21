@@ -3,11 +3,9 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tests.utils_for_tests import with_test_server, logger
+from tests.utils_for_tests import logger
 
-CONFIG = 'testing'
 
-@with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
 def test_health_endpoint(client):
     """
     Тест эндпоинта проверки здоровья сервера

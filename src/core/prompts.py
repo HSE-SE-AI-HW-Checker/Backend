@@ -2,7 +2,7 @@
 Промпты для ML моделей.
 """
 
-def get_audit_prompt(project_structure: str, project_files: str) -> str:
+def get_audit_prompt(requirements: str, project_structure: str, project_files: str) -> str:
     """
     Генерирует промпт для аудита кода.
 
@@ -54,9 +54,7 @@ def get_audit_prompt(project_structure: str, project_files: str) -> str:
 # ВХОДНЫЕ ДАННЫЕ:
 
 <requirements>
-1. Язык программирования: Проект должен быть написан преимущественно на Python. (Оценка 10, если Python, 0 если нет).
-2. Архитектура и Паттерны: Оценка = 2.5 балла за каждый уникальный, корректно реализованный паттерн проектирования (Singleton, Factory, Observer, Strategy, Decorator и др.). Максимум 10 баллов. В обосновании перечислить найденные паттерны и файлы.
-3. Качество кода (PEP8): Код должен быть чистым, читаемым и следовать рекомендациям PEP8. Оценивай нейминг переменных, наличие docstring-ов, типизацию (type hints).
+{requirements}
 </requirements>
 
 <project_structure>

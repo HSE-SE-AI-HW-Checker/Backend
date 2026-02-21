@@ -3,12 +3,9 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tests.utils_for_tests import with_test_server, logger
-
-CONFIG = 'testing'
+from tests.utils_for_tests import logger
 
 
-@with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
 def test_sign_in_success(client):
     """
     Тест успешной авторизации пользователя
@@ -47,7 +44,6 @@ def test_sign_in_success(client):
     logger.info("\n✅ Тест успешной авторизации пройден!")
 
 
-@with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
 def test_sign_in_wrong_password(client):
     """
     Тест авторизации с неверным паролем
@@ -82,7 +78,6 @@ def test_sign_in_wrong_password(client):
     logger.info("\n✅ Тест авторизации с неверным паролем пройден!")
 
 
-@with_test_server(config=CONFIG, startup_delay=2, max_wait=10)
 def test_sign_in_nonexistent_user(client):
     """
     Тест авторизации несуществующего пользователя

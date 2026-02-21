@@ -39,6 +39,7 @@ class ServerConfig:
     # JWT Authentication settings
     jwt_secret_key: str
     
+    database_url: Optional[str] = None
     log_file_mode: str = 'a'
     log_to_console: bool = True
     log_level: str = 'WARNING'
@@ -77,6 +78,9 @@ class ServerConfig:
         if not self.database_implementation or not isinstance(self.database_implementation, str):
             raise ValueError("database_implementation должен быть непустой строкой")
         
+        if self.database_url and not isinstance(self.database_url, str):
+            raise ValueError("database_url должен быть строкой")
+
         if not self.host or not isinstance(self.host, str):
             raise ValueError("host должен быть непустой строкой")
         
@@ -181,6 +185,7 @@ class ServerConfig:
             'log_to_console': self.log_to_console,
             'log_level': self.log_level,
             'database_implementation': self.database_implementation,
+            'database_url': self.database_url,
             'host': self.host,
             'port': self.port,
             'reload': self.reload,

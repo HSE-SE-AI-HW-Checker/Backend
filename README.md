@@ -90,7 +90,8 @@ log_file_path: logs/server.log       # Путь к логам
 log_file_mod: a                      # (a)ppend, (w)rite
 log_to_console: true                 # Писать ли логи в консоль
 log_level: INFO                      # Уровень логирования
-database_implementation: SQLite      # Класс БД
+database_implementation: SQLAlchemyDB # Класс БД (SQLAlchemyDB или SQLite)
+database_url: sqlite:///data/AppUsers.db # URL подключения к БД
 host: localhost                      # Хост
 port: 8000                           # Порт
 reload: true                         # Автоперезагрузка

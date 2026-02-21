@@ -284,3 +284,247 @@ class SQLite(DB):
         db_path = BackendPath('data/AppUsers.db')
         if os.path.exists(db_path):
             os.remove(db_path)
+
+class SQLAlchemyDB(DB):
+    """Реализация базы данных на SQLAlchemy."""
+
+    def __init__(self, database_url=None):
+        """
+        Инициализация SQLAlchemy базы данных.
+        
+        Args:
+            database_url: URL подключения к БД. Если None, берется из конфига.
+        """
+        from .database import get_engine, get_session_maker, Base
+        from ..models.orm import User, Session
+        from .config_manager import get_from_config
+
+        if database_url is None:
+            # Пытаемся получить URL из конфига, иначе используем дефолтный SQLite
+            try:
+                database_url = get_from_config("database_url")
+            except AttributeError:
+                # Fallback для обратной совместимости
+                db_path = BackendPath('data/AppUsers.db')
+                database_url = f"sqlite:///{db_path}"
+
+        self.engine = get_engine(database_url)
+        self.SessionLocal = get_session_maker(self.engine)
+        
+        # Создаем таблицы
+        Base.metadata.create_all(bind=self.engine)
+
+    def get_session(self):
+        """Получить сессию БД."""
+        return self.SessionLocal()
+
+    def add_user(self, username, email, password):
+        """
+        Добавить пользователя в базу данных.
+
+        Args:
+            username: Имя пользователя
+            email: Email пользователя
+            password: Пароль пользователя
+
+        Returns:
+            dict: Результат операции с полями message, error и user_id
+        """
+        from ..security.encryptors import hash_password
+        from ..models.orm import User
+        from sqlalchemy.exc import IntegrityError
+
+        if username is None:
+            username = email.split('@')[0]
+
+        password_hash = hash_password(password)
+        
+        session = self.get_session()
+        try:
+            new_user = User(username=username, email=email, password=password_hash)
+            session.add(new_user)
+            session.commit()
+            session.refresh(new_user)
+            
+            return {
+                "message": "Пользователь зарегистрирован",
+                "error": False,
+                "user_id": new_user.id
+            }
+        except IntegrityError:
+            session.rollback()
+            return {"message": "Пользователь с таким email уже существует", "error": True}
+        finally:
+            session.close()
+
+    def check_user(self, email, password):
+        """
+        Проверить учетные данные пользователя.
+
+        Args:
+            email: Email пользователя
+            password: Пароль пользователя
+
+        Returns:
+            dict: Результат проверки с полями message, error и user_id
+        """
+        from ..security.encryptors import verify_password
+        from ..models.orm import User
+
+        session = self.get_session()
+        try:
+            user = session.query(User).filter(User.email == email).first()
+
+            if user is None:
+                return {"message": f"Почта {email} не зарегистрирована", "error": True}
+
+            if not verify_password(password, user.password):
+                return {"message": "Неверный пароль", "error": True}
+
+            return {
+                "message": "",
+                "error": False,
+                "user_id": user.id
+            }
+        finally:
+            session.close()
+
+    def create_session(self, user_id: int, token: str, expires_at: str,
+                       user_agent: str = None, ip_address: str = None) -> dict:
+        """
+        Создать новую сессию для пользователя.
+
+        Args:
+            user_id: ID пользователя
+            token: JWT токен
+            expires_at: Время истечения в ISO формате
+            user_agent: User-Agent браузера
+            ip_address: IP адрес клиента
+
+        Returns:
+            dict: {'session_id': int, 'error': bool}
+        """
+        from ..models.orm import Session
+        from datetime import datetime
+
+        session = self.get_session()
+        try:
+            # Преобразуем строку ISO в datetime объект, если нужно
+            # SQLAlchemy TIMESTAMP ожидает datetime объект
+            if isinstance(expires_at, str):
+                expires_dt = datetime.fromisoformat(expires_at)
+            else:
+                expires_dt = expires_at
+
+            new_session = Session(
+                user_id=user_id,
+                token=token,
+                expires_at=expires_dt,
+                user_agent=user_agent,
+                ip_address=ip_address
+            )
+            session.add(new_session)
+            session.commit()
+            session.refresh(new_session)
+            return {"session_id": new_session.id, "error": False}
+        except Exception as e:
+            session.rollback()
+            return {"error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def validate_token(self, token: str) -> dict:
+        """
+        Проверить валидность токена.
+
+        Args:
+            token: JWT токен
+
+        Returns:
+            dict: {
+                'valid': bool,
+                'user_id': int|None,
+                'session_id': int|None,
+                'error': bool
+            }
+        """
+        from ..models.orm import Session, User
+        from datetime import datetime
+
+        session = self.get_session()
+        try:
+            result = session.query(Session, User).join(User).filter(
+                Session.token == token,
+                Session.is_active == True
+            ).first()
+
+            if result is None:
+                return {"valid": False, "error": False, "message": "Токен не найден"}
+
+            db_session, user = result
+
+            # Проверка истечения срока
+            if datetime.utcnow() > db_session.expires_at:
+                # Деактивировать истекший токен
+                db_session.is_active = False
+                session.commit()
+                return {"valid": False, "error": False, "message": "Токен истек"}
+
+            return {
+                "valid": True,
+                "user_id": user.id,
+                "session_id": db_session.id,
+                "email": user.email,
+                "username": user.username,
+                "error": False
+            }
+
+        except Exception as e:
+            return {"valid": False, "error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def revoke_token(self, token: str) -> dict:
+        """
+        Отозвать токен (logout).
+
+        Args:
+            token: JWT токен
+
+        Returns:
+            dict: {'success': bool, 'error': bool, 'message': str}
+        """
+        from ..models.orm import Session
+
+        session = self.get_session()
+        try:
+            db_session = session.query(Session).filter(Session.token == token).first()
+
+            if db_session:
+                db_session.is_active = False
+                session.commit()
+                return {"success": True, "error": False, "message": "Токен успешно отозван"}
+            else:
+                return {"success": False, "error": False, "message": "Токен не найден"}
+
+        except Exception as e:
+            session.rollback()
+            return {"success": False, "error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    @staticmethod
+    def drop():
+        """Удалить файл базы данных (если это SQLite файл)."""
+        from .config_manager import get_from_config
+        try:
+            database_url = get_from_config("database_url")
+            if database_url.startswith("sqlite:///"):
+                path = database_url.replace("sqlite:///", "")
+                if path != ":memory:" and os.path.exists(path):
+                    os.remove(path)
+        except AttributeError:
+             # Fallback
+            db_path = BackendPath('data/AppUsers.db')
+            if os.path.exists(db_path):
+                os.remove(db_path)
