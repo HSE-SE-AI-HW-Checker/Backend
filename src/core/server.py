@@ -16,6 +16,7 @@ from src.utils.helpers import parse_submitted_data
 from src.core.config_manager import get_ml_server_address
 from src.models.config import ServerConfig
 from src.services.file_processor import FolderStructure
+from src.services.orchestration_service import BigBoss
 from src.security import get_current_user
 from src.core.prompts import get_audit_prompt
 from src.core.constants import DEFAULT_MOCK_RESPONSE
@@ -298,6 +299,7 @@ class Server:
                 dict: Ответ от ML сервера
             """
 
+            boss = BigBoss(get_ml_server_address())
             folder_structure = parse_submitted_data(submitted_data)
             if not folder_structure:
                 return {
@@ -305,21 +307,7 @@ class Server:
                     "prompt": "Some random prompt"
                 }
 
-            prompt = get_audit_prompt(
-                submitted_data.requirements,
-                project_structure=folder_structure.__str__(),
-                project_files=folder_structure.get_files_content()
-            )
-
-            response = requests.post(
-                f'{str(get_ml_server_address())}/generate',
-                json={
-                    "prompt": prompt,
-                    "temperature": 0.3,
-                    "stream": False
-                },
-                headers={'Content-Type': 'application/json'}
-            )
+            response = boss(submitted_data.requirements)
 
             return response.json()
 
