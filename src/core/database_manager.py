@@ -334,6 +334,17 @@ class SQLite(DB):
         except sqlite3.Error as e:
             return {"error": True, "message": str(e)}
 
+    @staticmethod
+    def _normalize_criteria(raw: list) -> list:
+        """Привести критерии к формату [{criterion_text, is_ai_verified}]."""
+        result = []
+        for c in raw:
+            if isinstance(c, str):
+                result.append({"criterion_text": c, "is_ai_verified": False})
+            else:
+                result.append(c)
+        return result
+
     def get_room(self, room_id: str) -> dict:
         """Получить комнату по ID."""
         import json
@@ -354,7 +365,7 @@ class SQLite(DB):
                     "name": result[1],
                     "creator_id": result[2],
                     "description": result[3],
-                    "criteria": json.loads(result[4]),
+                    "criteria": self._normalize_criteria(json.loads(result[4])),
                     "created_at": result[5],
                     "participant_count": result[6]
                 },
@@ -381,7 +392,7 @@ class SQLite(DB):
                     "name": row[1],
                     "creator_id": row[2],
                     "description": row[3],
-                    "criteria": json.loads(row[4]),
+                    "criteria": self._normalize_criteria(json.loads(row[4])),
                     "created_at": row[5],
                     "participant_count": row[6]
                 }
@@ -458,6 +469,21 @@ class SQLite(DB):
             }
         except sqlite3.Error as e:
             return {"criteria": [], "error": True, "message": str(e)}
+
+    def get_all_criteria_room(self) -> dict:
+        """Получить все записи criteria_room."""
+        try:
+            self.cursor.execute("SELECT criterion_text, room_id, can_ai_verified FROM criteria_room")
+            rows = self.cursor.fetchall()
+            return {
+                "criteria_room": [
+                    {"criterion_text": row[0], "room_id": row[1], "can_ai_verified": bool(row[2])}
+                    for row in rows
+                ],
+                "error": False,
+            }
+        except sqlite3.Error as e:
+            return {"criteria_room": [], "error": True, "message": str(e)}
 
     @staticmethod
     def drop():
@@ -728,6 +754,17 @@ class SQLAlchemyDB(DB):
         finally:
             session.close()
 
+    @staticmethod
+    def _normalize_criteria(raw: list) -> list:
+        """Привести критерии к формату [{criterion_text, is_ai_verified}]."""
+        result = []
+        for c in raw:
+            if isinstance(c, str):
+                result.append({"criterion_text": c, "is_ai_verified": False})
+            else:
+                result.append(c)
+        return result
+
     def get_room(self, room_id: str) -> dict:
         """Получить комнату по ID."""
         from ..models.orm import Room
@@ -745,7 +782,7 @@ class SQLAlchemyDB(DB):
                     "name": room.name,
                     "creator_id": room.creator_id,
                     "description": room.description,
-                    "criteria": room.criteria,
+                    "criteria": self._normalize_criteria(room.criteria or []),
                     "created_at": room.created_at.isoformat() if room.created_at else None,
                     "participant_count": room.participant_count
                 },
@@ -769,7 +806,7 @@ class SQLAlchemyDB(DB):
                         "name": room.name,
                         "creator_id": room.creator_id,
                         "description": room.description,
-                        "criteria": room.criteria,
+                        "criteria": self._normalize_criteria(room.criteria or []),
                         "created_at": room.created_at.isoformat() if room.created_at else None,
                         "participant_count": room.participant_count
                     }
@@ -874,6 +911,25 @@ class SQLAlchemyDB(DB):
             }
         except Exception as e:
             return {"criteria": [], "error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def get_all_criteria_room(self) -> dict:
+        """Получить все записи criteria_room."""
+        from ..models.orm import CriterionRoom
+
+        session = self.get_session()
+        try:
+            records = session.query(CriterionRoom).all()
+            return {
+                "criteria_room": [
+                    {"criterion_text": r.criterion_text, "room_id": r.room_id, "can_ai_verified": r.can_ai_verified}
+                    for r in records
+                ],
+                "error": False,
+            }
+        except Exception as e:
+            return {"criteria_room": [], "error": True, "message": str(e)}
         finally:
             session.close()
 

@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse
 
 from .core.server import Server
 from .models.schemas import (
-    CriterionRecord, CriterionVerifyRequest, CriterionVerifyResponse,
+    CriterionRecord, CriterionRoomRecord, CriterionVerifyRequest, CriterionVerifyResponse,
     RoomCreate, RoomResponse,
 )
 from .security import get_current_user
@@ -23,7 +23,7 @@ app = server_instance.app
 @app.post("/create_room", response_model=RoomResponse)
 async def create_room(room_data: RoomCreate, current_user: dict = Depends(get_current_user)):
     """Создать комнату."""
-    # Для критериев с is_ai_verified=True — проверяем через criteria таблицу
+    # Для критериев с is_ai_verified=True — проверяем наличие записи в criteria
     for criterion in room_data.criteria:
         if not criterion.is_ai_verified:
             continue
@@ -32,21 +32,11 @@ async def create_room(room_data: RoomCreate, current_user: dict = Depends(get_cu
         if existing.get("error"):
             raise HTTPException(status_code=500, detail=existing["message"])
 
-        if existing["criterion"] is not None:
-            can_ai_verified = existing["criterion"]["ai_verified"]
-        else:
-            can_ai_verified = random.choice([True, False])
-            save_result = server_instance.db.create_criterion(
-                criterion_text=criterion.criterion_text,
-                ai_verified=can_ai_verified,
-            )
-            if save_result.get("error"):
-                raise HTTPException(status_code=400, detail=save_result["message"])
-
-        if not can_ai_verified:
+        record = existing["criterion"]
+        if record is None or not record["ai_verified"]:
             raise HTTPException(
                 status_code=400,
-                detail=f"Критерий '{criterion.criterion_text}' не может быть проверен через AI",
+                detail=f"Критерий '{criterion.criterion_text}' не совпадает со статусом верификации через AI. Сначала вызовите /criteria/verify",
             )
 
     # Создаём комнату
@@ -61,14 +51,12 @@ async def create_room(room_data: RoomCreate, current_user: dict = Depends(get_cu
 
     room_id = result["room_id"]
 
-    # Создаём записи в criteria_room для AI-верифицированных критериев
+    # Создаём записи в criteria_room для всех критериев
     for criterion in room_data.criteria:
-        if not criterion.is_ai_verified:
-            continue
         cr_result = server_instance.db.create_criterion_room(
             criterion_text=criterion.criterion_text,
             room_id=room_id,
-            can_ai_verified=True,
+            can_ai_verified=criterion.is_ai_verified,
         )
         if cr_result.get("error"):
             raise HTTPException(status_code=400, detail=cr_result["message"])
@@ -77,7 +65,7 @@ async def create_room(room_data: RoomCreate, current_user: dict = Depends(get_cu
     return room["room"]
 
 
-@app.get("/rooms", response_model=List[RoomResponse])
+@app.get("/rooms", response_model=List[RoomResponse], summary="[dev only] Получить все комнаты пользователя")
 async def get_user_rooms(current_user: dict = Depends(get_current_user)):
     """Получить все комнаты текущего пользователя."""
     result = server_instance.db.get_user_rooms(current_user["user_id"])
@@ -95,13 +83,22 @@ async def get_room(room_id: str, current_user: dict = Depends(get_current_user))
     return result["room"]
 
 
-@app.get("/criteria", response_model=List[CriterionRecord])
+@app.get("/criteria", response_model=List[CriterionRecord], summary="[dev only] Получить все критерии")
 async def get_all_criteria(_: dict = Depends(get_current_user)):
     """Получить все записи из таблицы criteria."""
     result = server_instance.db.get_all_criteria()
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["message"])
     return result["criteria"]
+
+
+@app.get("/criteria_room", response_model=List[CriterionRoomRecord], summary="[dev only] Получить все записи criteria_room")
+async def get_all_criteria_room(_: dict = Depends(get_current_user)):
+    """Получить все записи из таблицы criteria_room."""
+    result = server_instance.db.get_all_criteria_room()
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=result["message"])
+    return result["criteria_room"]
 
 
 @app.post("/criteria/verify", response_model=CriterionVerifyResponse)

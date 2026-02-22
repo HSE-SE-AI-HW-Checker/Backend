@@ -80,6 +80,13 @@ class CriterionRecord(BaseModel):
     ai_verified: bool
 
 
+class CriterionRoomRecord(BaseModel):
+    """Запись из таблицы criteria_room."""
+    criterion_text: str
+    room_id: str
+    can_ai_verified: bool
+
+
 class CriterionVerifyRequest(BaseModel):
     """Запрос на верификацию критерия."""
     criterion_text: str
