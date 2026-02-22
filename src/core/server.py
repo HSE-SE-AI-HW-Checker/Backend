@@ -309,7 +309,11 @@ class Server:
 
             response = boss.audit(submitted_data.requirements, project_data)
 
-            return response
+
+
+            return ModelResponse(
+                text=response,
+            )
 
     def run(self):
         """Запустить сервер."""

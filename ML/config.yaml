@@ -82,7 +82,7 @@ models:
       temperature: 0.2
       top_p: 0.95
       top_k: 40
-      repeat_penalty: 1.05
+      repeat_penalty: 1.6
       max_tokens: 1024
       stream: true
 

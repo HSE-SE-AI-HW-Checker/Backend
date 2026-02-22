@@ -54,7 +54,6 @@ class GenerateResponse(BaseModel):
     """Модель ответа для генерации текста (non-streaming)."""
     
     text: str = Field(..., description="Сгенерированный текст")
-    prompt: str = Field(..., description="Исходный промпт")
 
 
 class HealthResponse(BaseModel):
@@ -331,7 +330,6 @@ async def generate(request: GenerateRequest):
             
             return GenerateResponse(
                 text=response_text,
-                prompt=''
             )
     
     except HTTPException:

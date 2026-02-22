@@ -54,4 +54,3 @@ class ModelResponse(BaseModel):
     """Модель ответа для генерации текста (non-streaming)."""
     
     text: str = Field(..., description="Сгенерированный текст")
-    prompt: str = Field(..., description="Исходный промпт")

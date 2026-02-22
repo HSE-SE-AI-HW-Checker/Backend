@@ -10,7 +10,6 @@ from src.services.file_processor import FolderStructure
 logger = logging.getLogger(__name__)
 MOCK_RESPONSE = {
   "text": "smth",
-  "prompt" :""
 }
 
 
@@ -39,8 +38,9 @@ class BigBoss:
       logger.error(f'HTTP request failed {e}.')
       return MOCK_RESPONSE
     
-  
-    
-  def audit(self, requirements: str, project: FolderStructure) -> Dict[str, Any]:
-    processed_reqs = self._get_answer(get_orchestrator_prompt(requirements), max_tokens=1024)
+  def audit(self, requirements: Dict[str, int], project: FolderStructure) -> str:
+    processed_reqs = ''
+    STEP = 3
+    for i in range(0, len(requirements.keys()), STEP):
+      processed_reqs += self._get_answer(get_orchestrator_prompt(list(requirements.keys())[i:i+STEP]), max_tokens=512)['text']
     return processed_reqs
