@@ -2,10 +2,20 @@
 ORM модели базы данных.
 """
 
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, TIMESTAMP
+import random
+import string
+
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Text, JSON, TIMESTAMP
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from ..core.database import Base
+
+
+def generate_room_id() -> str:
+    """Генерация ID комнаты в формате XXXX-XXXX-XXXX."""
+    chars = string.ascii_uppercase + string.digits
+    parts = [''.join(random.choices(chars, k=4)) for _ in range(3)]
+    return '-'.join(parts)
 
 class User(Base):
     """Модель пользователя."""
@@ -18,6 +28,8 @@ class User(Base):
 
     # Связь с сессиями
     sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
+    # Связь с комнатами
+    rooms = relationship("Room", back_populates="creator", cascade="all, delete-orphan")
 
 class Session(Base):
     """Модель сессии пользователя."""
@@ -34,3 +46,36 @@ class Session(Base):
 
     # Связь с пользователем
     user = relationship("User", back_populates="sessions")
+
+
+class Room(Base):
+    """Модель комнаты."""
+    __tablename__ = "rooms"
+
+    id = Column(String, primary_key=True, default=generate_room_id)
+    name = Column(String, nullable=False)
+    creator_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    description = Column(Text, nullable=False, default="")
+    criteria = Column(JSON, nullable=False, default=list)
+    created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
+    participant_count = Column(Integer, nullable=False, default=0)
+
+    # Связь с создателем
+    creator = relationship("User", back_populates="rooms")
+
+
+class Criterion(Base):
+    """Модель критерия проверки."""
+    __tablename__ = "criteria"
+
+    criterion_text = Column(String, primary_key=True)
+    ai_verified = Column(Boolean, nullable=False, default=False)
+
+
+class CriterionRoom(Base):
+    """Связь критерия с комнатой."""
+    __tablename__ = "criteria_room"
+
+    criterion_text = Column(String, ForeignKey("criteria.criterion_text", ondelete="CASCADE"), primary_key=True)
+    room_id = Column(String, ForeignKey("rooms.id", ondelete="CASCADE"), primary_key=True)
+    can_ai_verified = Column(Boolean, nullable=False, default=False)

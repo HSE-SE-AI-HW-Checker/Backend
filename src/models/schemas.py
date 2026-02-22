@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 class User(BaseModel):
     """Модель пользователя."""
@@ -50,8 +50,48 @@ class SubmittedData(BaseModel):
     data_type: int
 
 
+class Criterion(BaseModel):
+    """Критерий проверки."""
+    criterion_text: str
+    is_ai_verified: bool
+
+
+class RoomCreate(BaseModel):
+    """Данные для создания комнаты."""
+    name: str
+    description: str = ""
+    criteria: List[Criterion] = []
+
+
+class RoomResponse(BaseModel):
+    """Ответ с данными комнаты."""
+    id: str
+    name: str
+    creator_id: int
+    description: str
+    criteria: List[Criterion]
+    created_at: str
+    participant_count: int
+
+
+class CriterionRecord(BaseModel):
+    """Запись критерия из таблицы criteria."""
+    criterion_text: str
+    ai_verified: bool
+
+
+class CriterionVerifyRequest(BaseModel):
+    """Запрос на верификацию критерия."""
+    criterion_text: str
+
+
+class CriterionVerifyResponse(BaseModel):
+    """Ответ на верификацию критерия."""
+    can_ai_verified: bool
+
+
 class ModelResponse(BaseModel):
     """Модель ответа для генерации текста (non-streaming)."""
-    
+
     text: str = Field(..., description="Сгенерированный текст")
     prompt: str = Field(..., description="Исходный промпт")
