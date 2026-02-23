@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse
 from .core.server import Server
 from .models.schemas import (
     CriterionRecord, CriterionRoomRecord, CriterionVerifyRequest, CriterionVerifyResponse,
-    RoomCreate, RoomResponse,
+    LanguageCreate, RoomCreate, RoomResponse,
 )
 from .security import get_current_user
 
@@ -23,6 +23,16 @@ app = server_instance.app
 @app.post("/create_room", response_model=RoomResponse)
 async def create_room(room_data: RoomCreate, current_user: dict = Depends(get_current_user)):
     """Создать комнату."""
+    # Проверяем, что указанный язык программирования существует в таблице languages
+    langs_result = server_instance.db.get_all_languages()
+    if langs_result.get("error"):
+        raise HTTPException(status_code=500, detail=langs_result["message"])
+    if room_data.language not in langs_result["languages"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Язык программирования '{room_data.language}' не найден. Доступные: {langs_result['languages']}",
+        )
+
     # Для критериев с is_ai_verified=True — проверяем наличие записи в criteria
     for criterion in room_data.criteria:
         if not criterion.is_ai_verified:
@@ -133,6 +143,33 @@ async def verify_criterion(
         raise HTTPException(status_code=400, detail=result["message"])
 
     return {"can_ai_verified": can_ai_verified}
+
+
+@app.get("/languages", response_model=List[str])
+async def get_languages():
+    """Получить список всех доступных языков программирования."""
+    result = server_instance.db.get_all_languages()
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=result["message"])
+    return result["languages"]
+
+
+@app.post("/languages", summary="[dev only] Добавить язык программирования")
+async def add_language(data: LanguageCreate, _: dict = Depends(get_current_user)):
+    """Добавить язык программирования в список доступных."""
+    result = server_instance.db.add_language(data.language)
+    if result.get("error"):
+        raise HTTPException(status_code=400, detail=result["message"])
+    return {"language": data.language}
+
+
+@app.delete("/languages/{language}", summary="[dev only] Удалить язык программирования")
+async def delete_language(language: str, _: dict = Depends(get_current_user)):
+    """Удалить язык программирования из списка доступных."""
+    result = server_instance.db.delete_language(language)
+    if result.get("error"):
+        raise HTTPException(status_code=404, detail=result["message"])
+    return {"language": language}
 
 
 @app.get("/info")

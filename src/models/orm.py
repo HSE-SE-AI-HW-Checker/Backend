@@ -73,6 +73,13 @@ class Criterion(Base):
     ai_verified = Column(Boolean, nullable=False, default=False)
 
 
+class Language(Base):
+    """Доступный язык программирования."""
+    __tablename__ = "languages"
+
+    language = Column(String, primary_key=True)
+
+
 class CriterionRoom(Base):
     """Связь критерия с комнатой."""
     __tablename__ = "criteria_room"

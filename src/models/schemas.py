@@ -97,6 +97,11 @@ class CriterionRoomRecord(BaseModel):
     can_ai_verified: bool
 
 
+class LanguageCreate(BaseModel):
+    """Запрос на добавление языка программирования."""
+    language: str = Field(..., min_length=1, description="Название языка программирования")
+
+
 class CriterionVerifyRequest(BaseModel):
     """Запрос на верификацию критерия."""
     criterion_text: str = Field(..., min_length=1, description="Текст критерия (не может быть пустым)")
