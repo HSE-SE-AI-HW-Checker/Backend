@@ -90,6 +90,55 @@ class SQLite(DB):
         self.cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)')
         self.cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_active ON sessions(is_active, expires_at)')
 
+        # Создание таблицы rooms
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS rooms (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            creator_id INTEGER NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            language TEXT NOT NULL DEFAULT '',
+            criteria TEXT NOT NULL DEFAULT '[]',
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            participant_count INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
+        )''')
+
+        # Миграция: добавить колонку language если её нет
+        self.cursor.execute("PRAGMA table_info(rooms)")
+        rooms_columns = {row[1] for row in self.cursor.fetchall()}
+        if 'language' not in rooms_columns:
+            self.cursor.execute("ALTER TABLE rooms ADD COLUMN language TEXT NOT NULL DEFAULT ''")
+
+        self.cursor.execute('CREATE INDEX IF NOT EXISTS idx_rooms_creator_id ON rooms(creator_id)')
+
+        # Миграция: пересоздать criteria если старая схема (с user_id или room_id)
+        self.cursor.execute("PRAGMA table_info(criteria)")
+        criteria_columns = {row[1] for row in self.cursor.fetchall()}
+        if criteria_columns and ('user_id' in criteria_columns or 'room_id' in criteria_columns):
+            self.cursor.execute("DROP TABLE IF EXISTS criteria_room")
+            self.cursor.execute("DROP TABLE IF EXISTS criteria")
+
+        # Создание таблицы criteria
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS criteria (
+            criterion_text TEXT PRIMARY KEY NOT NULL,
+            ai_verified BOOLEAN NOT NULL DEFAULT 0
+        )''')
+
+        # Создание таблицы criteria_room
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS criteria_room (
+            criterion_text TEXT NOT NULL,
+            room_id TEXT NOT NULL,
+            can_ai_verified BOOLEAN NOT NULL DEFAULT 0,
+            PRIMARY KEY (criterion_text, room_id),
+            FOREIGN KEY (criterion_text) REFERENCES criteria(criterion_text) ON DELETE CASCADE,
+            FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+        )''')
+
+        # Создание таблицы languages
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS languages (
+            language TEXT PRIMARY KEY NOT NULL
+        )''')
+
         self.connection.commit()
 
     def execute(self, query):
@@ -278,6 +327,220 @@ class SQLite(DB):
         except sqlite3.Error as e:
             return {"success": False, "error": True, "message": str(e)}
 
+    def create_room(self, creator_id: int, name: str, description: str = "",
+                    language: str = "", criteria: list = None) -> dict:
+        """Создать комнату."""
+        import json
+        from ..models.orm import generate_room_id
+
+        room_id = generate_room_id()
+        criteria_json = json.dumps(criteria or [], ensure_ascii=False)
+
+        try:
+            self.cursor.execute("""
+                INSERT INTO rooms (id, name, creator_id, description, language, criteria)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (room_id, name, creator_id, description, language, criteria_json))
+            self.connection.commit()
+            return {"room_id": room_id, "error": False}
+        except sqlite3.Error as e:
+            return {"error": True, "message": str(e)}
+
+    @staticmethod
+    def _normalize_criteria(raw: list) -> list:
+        """Привести критерии к формату [{criterion_text, is_ai_verified}], пропуская пустые."""
+        result = []
+        for c in raw:
+            if isinstance(c, str):
+                if c:
+                    result.append({"criterion_text": c, "is_ai_verified": False})
+            else:
+                if c.get("criterion_text"):
+                    result.append(c)
+        return result
+
+    def get_room(self, room_id: str) -> dict:
+        """Получить комнату по ID."""
+        import json
+
+        try:
+            self.cursor.execute("""
+                SELECT id, name, creator_id, description, language, criteria, created_at, participant_count
+                FROM rooms WHERE id = ?
+            """, (room_id,))
+            result = self.cursor.fetchone()
+
+            if result is None:
+                return {"error": True, "message": "Комната не найдена"}
+
+            return {
+                "room": {
+                    "id": result[0],
+                    "name": result[1],
+                    "creator_id": result[2],
+                    "description": result[3],
+                    "language": result[4],
+                    "criteria": self._normalize_criteria(json.loads(result[5])),
+                    "created_at": result[6],
+                    "participant_count": result[7]
+                },
+                "error": False
+            }
+        except sqlite3.Error as e:
+            return {"error": True, "message": str(e)}
+
+    def get_user_rooms(self, user_id: int) -> dict:
+        """Получить все комнаты пользователя."""
+        import json
+
+        try:
+            self.cursor.execute("""
+                SELECT id, name, creator_id, description, language, criteria, created_at, participant_count
+                FROM rooms WHERE creator_id = ?
+                ORDER BY created_at DESC
+            """, (user_id,))
+            rows = self.cursor.fetchall()
+
+            rooms = [
+                {
+                    "id": row[0],
+                    "name": row[1],
+                    "creator_id": row[2],
+                    "description": row[3],
+                    "language": row[4],
+                    "criteria": self._normalize_criteria(json.loads(row[5])),
+                    "created_at": row[6],
+                    "participant_count": row[7]
+                }
+                for row in rows
+            ]
+            return {"rooms": rooms, "error": False}
+        except sqlite3.Error as e:
+            return {"error": True, "message": str(e)}
+
+    def delete_room(self, room_id: str) -> dict:
+        """Удалить комнату."""
+        try:
+            self.cursor.execute("DELETE FROM rooms WHERE id = ?", (room_id,))
+            self.connection.commit()
+            if self.cursor.rowcount > 0:
+                return {"success": True, "error": False, "message": "Комната удалена"}
+            return {"success": False, "error": False, "message": "Комната не найдена"}
+        except sqlite3.Error as e:
+            return {"success": False, "error": True, "message": str(e)}
+
+    def delete_user_rooms(self, user_id: int) -> dict:
+        """Удалить все комнаты пользователя (criteria_room удаляются каскадно)."""
+        try:
+            self.cursor.execute("DELETE FROM rooms WHERE creator_id = ?", (user_id,))
+            self.connection.commit()
+            return {"deleted_count": self.cursor.rowcount, "error": False}
+        except sqlite3.Error as e:
+            return {"deleted_count": 0, "error": True, "message": str(e)}
+
+    def get_criterion(self, criterion_text: str) -> dict:
+        """Получить критерий по тексту."""
+        try:
+            self.cursor.execute(
+                "SELECT criterion_text, ai_verified FROM criteria WHERE criterion_text = ?",
+                (criterion_text,)
+            )
+            row = self.cursor.fetchone()
+            if row is None:
+                return {"criterion": None, "error": False}
+            return {"criterion": {"criterion_text": row[0], "ai_verified": bool(row[1])}, "error": False}
+        except sqlite3.Error as e:
+            return {"criterion": None, "error": True, "message": str(e)}
+
+    def create_criterion(self, criterion_text: str, ai_verified: bool) -> dict:
+        """Создать критерий."""
+        try:
+            self.cursor.execute(
+                "INSERT INTO criteria (criterion_text, ai_verified) VALUES (?, ?)",
+                (criterion_text, ai_verified)
+            )
+            self.connection.commit()
+            return {"error": False}
+        except sqlite3.IntegrityError as e:
+            msg = str(e)
+            if "UNIQUE" in msg or "PRIMARY KEY" in msg:
+                return {"error": True, "message": "Такой критерий уже существует"}
+            return {"error": True, "message": f"Ошибка схемы БД: {msg}. Пересоздайте базу данных."}
+        except sqlite3.Error as e:
+            return {"error": True, "message": str(e)}
+
+    def create_criterion_room(self, criterion_text: str, room_id: str, can_ai_verified: bool) -> dict:
+        """Создать запись в таблице criteria_room."""
+        try:
+            self.cursor.execute(
+                "INSERT INTO criteria_room (criterion_text, room_id, can_ai_verified) VALUES (?, ?, ?)",
+                (criterion_text, room_id, can_ai_verified)
+            )
+            self.connection.commit()
+            return {"error": False}
+        except sqlite3.IntegrityError as e:
+            return {"error": True, "message": str(e)}
+        except sqlite3.Error as e:
+            return {"error": True, "message": str(e)}
+
+    def get_all_criteria(self) -> dict:
+        """Получить все критерии."""
+        try:
+            self.cursor.execute("SELECT criterion_text, ai_verified FROM criteria")
+            rows = self.cursor.fetchall()
+            return {
+                "criteria": [{"criterion_text": row[0], "ai_verified": bool(row[1])} for row in rows],
+                "error": False,
+            }
+        except sqlite3.Error as e:
+            return {"criteria": [], "error": True, "message": str(e)}
+
+    def get_all_criteria_room(self) -> dict:
+        """Получить все записи criteria_room."""
+        try:
+            self.cursor.execute("SELECT criterion_text, room_id, can_ai_verified FROM criteria_room")
+            rows = self.cursor.fetchall()
+            return {
+                "criteria_room": [
+                    {"criterion_text": row[0], "room_id": row[1], "can_ai_verified": bool(row[2])}
+                    for row in rows
+                ],
+                "error": False,
+            }
+        except sqlite3.Error as e:
+            return {"criteria_room": [], "error": True, "message": str(e)}
+
+    def get_all_languages(self) -> dict:
+        """Получить все языки программирования."""
+        try:
+            self.cursor.execute("SELECT language FROM languages ORDER BY language")
+            rows = self.cursor.fetchall()
+            return {"languages": [row[0] for row in rows], "error": False}
+        except sqlite3.Error as e:
+            return {"languages": [], "error": True, "message": str(e)}
+
+    def add_language(self, language: str) -> dict:
+        """Добавить язык программирования."""
+        try:
+            self.cursor.execute("INSERT INTO languages (language) VALUES (?)", (language,))
+            self.connection.commit()
+            return {"error": False}
+        except sqlite3.IntegrityError:
+            return {"error": True, "message": f"Язык '{language}' уже существует"}
+        except sqlite3.Error as e:
+            return {"error": True, "message": str(e)}
+
+    def delete_language(self, language: str) -> dict:
+        """Удалить язык программирования."""
+        try:
+            self.cursor.execute("DELETE FROM languages WHERE language = ?", (language,))
+            self.connection.commit()
+            if self.cursor.rowcount > 0:
+                return {"error": False}
+            return {"error": True, "message": f"Язык '{language}' не найден"}
+        except sqlite3.Error as e:
+            return {"error": True, "message": str(e)}
+
     @staticmethod
     def drop():
         """Удалить файл базы данных."""
@@ -310,9 +573,29 @@ class SQLAlchemyDB(DB):
 
         self.engine = get_engine(database_url)
         self.SessionLocal = get_session_maker(self.engine)
-        
+
+        # Миграция: пересоздать criteria если старая схема (с user_id или room_id)
+        from sqlalchemy import inspect, text
+        inspector = inspect(self.engine)
+        if 'criteria' in inspector.get_table_names():
+            existing_columns = {col['name'] for col in inspector.get_columns('criteria')}
+            if 'user_id' in existing_columns or 'room_id' in existing_columns:
+                with self.engine.connect() as conn:
+                    conn.execute(text("DROP TABLE IF EXISTS criteria_room"))
+                    conn.execute(text("DROP TABLE IF EXISTS criteria"))
+                    conn.commit()
+
         # Создаем таблицы
         Base.metadata.create_all(bind=self.engine)
+
+        # Миграция: добавить колонку language в rooms если её нет
+        inspector = inspect(self.engine)
+        if 'rooms' in inspector.get_table_names():
+            rooms_columns = {col['name'] for col in inspector.get_columns('rooms')}
+            if 'language' not in rooms_columns:
+                with self.engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE rooms ADD COLUMN language TEXT NOT NULL DEFAULT ''"))
+                    conn.commit()
 
     def get_session(self):
         """Получить сессию БД."""
@@ -510,6 +793,277 @@ class SQLAlchemyDB(DB):
         except Exception as e:
             session.rollback()
             return {"success": False, "error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def create_room(self, creator_id: int, name: str, description: str = "",
+                    language: str = "", criteria: list = None) -> dict:
+        """Создать комнату."""
+        from ..models.orm import Room
+
+        session = self.get_session()
+        try:
+            new_room = Room(
+                name=name,
+                creator_id=creator_id,
+                description=description,
+                language=language,
+                criteria=criteria or []
+            )
+            session.add(new_room)
+            session.commit()
+            session.refresh(new_room)
+            return {"room_id": new_room.id, "error": False}
+        except Exception as e:
+            session.rollback()
+            return {"error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    @staticmethod
+    def _normalize_criteria(raw: list) -> list:
+        """Привести критерии к формату [{criterion_text, is_ai_verified}], пропуская пустые."""
+        result = []
+        for c in raw:
+            if isinstance(c, str):
+                if c:
+                    result.append({"criterion_text": c, "is_ai_verified": False})
+            else:
+                if c.get("criterion_text"):
+                    result.append(c)
+        return result
+
+    def get_room(self, room_id: str) -> dict:
+        """Получить комнату по ID."""
+        from ..models.orm import Room
+
+        session = self.get_session()
+        try:
+            room = session.query(Room).filter(Room.id == room_id).first()
+
+            if room is None:
+                return {"error": True, "message": "Комната не найдена"}
+
+            return {
+                "room": {
+                    "id": room.id,
+                    "name": room.name,
+                    "creator_id": room.creator_id,
+                    "description": room.description,
+                    "language": room.language or "",
+                    "criteria": self._normalize_criteria(room.criteria or []),
+                    "created_at": room.created_at.isoformat() if room.created_at else None,
+                    "participant_count": room.participant_count
+                },
+                "error": False
+            }
+        finally:
+            session.close()
+
+    def get_user_rooms(self, user_id: int) -> dict:
+        """Получить все комнаты пользователя."""
+        from ..models.orm import Room
+
+        session = self.get_session()
+        try:
+            rooms = session.query(Room).filter(Room.creator_id == user_id).order_by(Room.created_at.desc()).all()
+
+            return {
+                "rooms": [
+                    {
+                        "id": room.id,
+                        "name": room.name,
+                        "creator_id": room.creator_id,
+                        "description": room.description,
+                        "language": room.language or "",
+                        "criteria": self._normalize_criteria(room.criteria or []),
+                        "created_at": room.created_at.isoformat() if room.created_at else None,
+                        "participant_count": room.participant_count
+                    }
+                    for room in rooms
+                ],
+                "error": False
+            }
+        except Exception as e:
+            return {"error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def delete_room(self, room_id: str) -> dict:
+        """Удалить комнату."""
+        from ..models.orm import Room
+
+        session = self.get_session()
+        try:
+            room = session.query(Room).filter(Room.id == room_id).first()
+            if room:
+                session.delete(room)
+                session.commit()
+                return {"success": True, "error": False, "message": "Комната удалена"}
+            return {"success": False, "error": False, "message": "Комната не найдена"}
+        except Exception as e:
+            session.rollback()
+            return {"success": False, "error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def delete_user_rooms(self, user_id: int) -> dict:
+        """Удалить все комнаты пользователя (criteria_room удаляются каскадно)."""
+        from ..models.orm import Room
+
+        session = self.get_session()
+        try:
+            deleted_count = session.query(Room).filter(Room.creator_id == user_id).delete(synchronize_session=False)
+            session.commit()
+            return {"deleted_count": deleted_count, "error": False}
+        except Exception as e:
+            session.rollback()
+            return {"deleted_count": 0, "error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def get_criterion(self, criterion_text: str) -> dict:
+        """Получить критерий по тексту."""
+        from ..models.orm import Criterion
+
+        session = self.get_session()
+        try:
+            criterion = session.query(Criterion).filter(Criterion.criterion_text == criterion_text).first()
+            if criterion is None:
+                return {"criterion": None, "error": False}
+            return {
+                "criterion": {"criterion_text": criterion.criterion_text, "ai_verified": criterion.ai_verified},
+                "error": False,
+            }
+        except Exception as e:
+            return {"criterion": None, "error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def create_criterion(self, criterion_text: str, ai_verified: bool) -> dict:
+        """Создать критерий."""
+        from ..models.orm import Criterion
+        from sqlalchemy.exc import IntegrityError
+
+        session = self.get_session()
+        try:
+            criterion = Criterion(criterion_text=criterion_text, ai_verified=ai_verified)
+            session.add(criterion)
+            session.commit()
+            return {"error": False}
+        except IntegrityError as e:
+            session.rollback()
+            msg = str(e.orig) if hasattr(e, 'orig') and e.orig else str(e)
+            if "unique" in msg.lower() or "primary key" in msg.lower() or "duplicate" in msg.lower():
+                return {"error": True, "message": "Такой критерий уже существует"}
+            return {"error": True, "message": f"Ошибка схемы БД: {msg}. Пересоздайте базу данных."}
+        except Exception as e:
+            session.rollback()
+            return {"error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def create_criterion_room(self, criterion_text: str, room_id: str, can_ai_verified: bool) -> dict:
+        """Создать запись в таблице criteria_room."""
+        from ..models.orm import CriterionRoom
+        from sqlalchemy.exc import IntegrityError
+
+        session = self.get_session()
+        try:
+            cr = CriterionRoom(criterion_text=criterion_text, room_id=room_id, can_ai_verified=can_ai_verified)
+            session.add(cr)
+            session.commit()
+            return {"error": False}
+        except IntegrityError as e:
+            session.rollback()
+            return {"error": True, "message": str(e.orig) if hasattr(e, 'orig') and e.orig else str(e)}
+        except Exception as e:
+            session.rollback()
+            return {"error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def get_all_criteria(self) -> dict:
+        """Получить все критерии."""
+        from ..models.orm import Criterion
+
+        session = self.get_session()
+        try:
+            criteria = session.query(Criterion).all()
+            return {
+                "criteria": [{"criterion_text": c.criterion_text, "ai_verified": c.ai_verified} for c in criteria],
+                "error": False,
+            }
+        except Exception as e:
+            return {"criteria": [], "error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def get_all_criteria_room(self) -> dict:
+        """Получить все записи criteria_room."""
+        from ..models.orm import CriterionRoom
+
+        session = self.get_session()
+        try:
+            records = session.query(CriterionRoom).all()
+            return {
+                "criteria_room": [
+                    {"criterion_text": r.criterion_text, "room_id": r.room_id, "can_ai_verified": r.can_ai_verified}
+                    for r in records
+                ],
+                "error": False,
+            }
+        except Exception as e:
+            return {"criteria_room": [], "error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def get_all_languages(self) -> dict:
+        """Получить все языки программирования."""
+        from ..models.orm import Language
+
+        session = self.get_session()
+        try:
+            langs = session.query(Language).order_by(Language.language).all()
+            return {"languages": [l.language for l in langs], "error": False}
+        except Exception as e:
+            return {"languages": [], "error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def add_language(self, language: str) -> dict:
+        """Добавить язык программирования."""
+        from ..models.orm import Language
+        from sqlalchemy.exc import IntegrityError
+
+        session = self.get_session()
+        try:
+            session.add(Language(language=language))
+            session.commit()
+            return {"error": False}
+        except IntegrityError:
+            session.rollback()
+            return {"error": True, "message": f"Язык '{language}' уже существует"}
+        except Exception as e:
+            session.rollback()
+            return {"error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def delete_language(self, language: str) -> dict:
+        """Удалить язык программирования."""
+        from ..models.orm import Language
+
+        session = self.get_session()
+        try:
+            deleted = session.query(Language).filter(Language.language == language).delete()
+            session.commit()
+            if deleted:
+                return {"error": False}
+            return {"error": True, "message": f"Язык '{language}' не найден"}
+        except Exception as e:
+            session.rollback()
+            return {"error": True, "message": str(e)}
         finally:
             session.close()
 

@@ -268,7 +268,7 @@ class Server:
                 "success": result.get("success", False)
             }
 
-        @self.app.get("/me")
+        @self.app.get("/me", summary="[dev only] Получить профиль текущего пользователя")
         async def get_profile(current_user: dict = Depends(get_current_user)):
             """
             Получить профиль текущего пользователя.
