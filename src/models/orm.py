@@ -56,6 +56,7 @@ class Room(Base):
     name = Column(String, nullable=False)
     creator_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     description = Column(Text, nullable=False, default="")
+    language = Column(String, nullable=False, default="")
     criteria = Column(JSON, nullable=False, default=list)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     participant_count = Column(Integer, nullable=False, default=0)

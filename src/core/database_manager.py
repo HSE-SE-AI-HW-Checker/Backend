@@ -96,11 +96,18 @@ class SQLite(DB):
             name TEXT NOT NULL,
             creator_id INTEGER NOT NULL,
             description TEXT NOT NULL DEFAULT '',
+            language TEXT NOT NULL DEFAULT '',
             criteria TEXT NOT NULL DEFAULT '[]',
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             participant_count INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
         )''')
+
+        # Миграция: добавить колонку language если её нет
+        self.cursor.execute("PRAGMA table_info(rooms)")
+        rooms_columns = {row[1] for row in self.cursor.fetchall()}
+        if 'language' not in rooms_columns:
+            self.cursor.execute("ALTER TABLE rooms ADD COLUMN language TEXT NOT NULL DEFAULT ''")
 
         self.cursor.execute('CREATE INDEX IF NOT EXISTS idx_rooms_creator_id ON rooms(creator_id)')
 
@@ -316,7 +323,7 @@ class SQLite(DB):
             return {"success": False, "error": True, "message": str(e)}
 
     def create_room(self, creator_id: int, name: str, description: str = "",
-                    criteria: list = None) -> dict:
+                    language: str = "", criteria: list = None) -> dict:
         """Создать комнату."""
         import json
         from ..models.orm import generate_room_id
@@ -326,9 +333,9 @@ class SQLite(DB):
 
         try:
             self.cursor.execute("""
-                INSERT INTO rooms (id, name, creator_id, description, criteria)
-                VALUES (?, ?, ?, ?, ?)
-            """, (room_id, name, creator_id, description, criteria_json))
+                INSERT INTO rooms (id, name, creator_id, description, language, criteria)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (room_id, name, creator_id, description, language, criteria_json))
             self.connection.commit()
             return {"room_id": room_id, "error": False}
         except sqlite3.Error as e:
@@ -336,13 +343,15 @@ class SQLite(DB):
 
     @staticmethod
     def _normalize_criteria(raw: list) -> list:
-        """Привести критерии к формату [{criterion_text, is_ai_verified}]."""
+        """Привести критерии к формату [{criterion_text, is_ai_verified}], пропуская пустые."""
         result = []
         for c in raw:
             if isinstance(c, str):
-                result.append({"criterion_text": c, "is_ai_verified": False})
+                if c:
+                    result.append({"criterion_text": c, "is_ai_verified": False})
             else:
-                result.append(c)
+                if c.get("criterion_text"):
+                    result.append(c)
         return result
 
     def get_room(self, room_id: str) -> dict:
@@ -351,7 +360,7 @@ class SQLite(DB):
 
         try:
             self.cursor.execute("""
-                SELECT id, name, creator_id, description, criteria, created_at, participant_count
+                SELECT id, name, creator_id, description, language, criteria, created_at, participant_count
                 FROM rooms WHERE id = ?
             """, (room_id,))
             result = self.cursor.fetchone()
@@ -365,9 +374,10 @@ class SQLite(DB):
                     "name": result[1],
                     "creator_id": result[2],
                     "description": result[3],
-                    "criteria": self._normalize_criteria(json.loads(result[4])),
-                    "created_at": result[5],
-                    "participant_count": result[6]
+                    "language": result[4],
+                    "criteria": self._normalize_criteria(json.loads(result[5])),
+                    "created_at": result[6],
+                    "participant_count": result[7]
                 },
                 "error": False
             }
@@ -380,7 +390,7 @@ class SQLite(DB):
 
         try:
             self.cursor.execute("""
-                SELECT id, name, creator_id, description, criteria, created_at, participant_count
+                SELECT id, name, creator_id, description, language, criteria, created_at, participant_count
                 FROM rooms WHERE creator_id = ?
                 ORDER BY created_at DESC
             """, (user_id,))
@@ -392,9 +402,10 @@ class SQLite(DB):
                     "name": row[1],
                     "creator_id": row[2],
                     "description": row[3],
-                    "criteria": self._normalize_criteria(json.loads(row[4])),
-                    "created_at": row[5],
-                    "participant_count": row[6]
+                    "language": row[4],
+                    "criteria": self._normalize_criteria(json.loads(row[5])),
+                    "created_at": row[6],
+                    "participant_count": row[7]
                 }
                 for row in rows
             ]
@@ -412,6 +423,15 @@ class SQLite(DB):
             return {"success": False, "error": False, "message": "Комната не найдена"}
         except sqlite3.Error as e:
             return {"success": False, "error": True, "message": str(e)}
+
+    def delete_user_rooms(self, user_id: int) -> dict:
+        """Удалить все комнаты пользователя (criteria_room удаляются каскадно)."""
+        try:
+            self.cursor.execute("DELETE FROM rooms WHERE creator_id = ?", (user_id,))
+            self.connection.commit()
+            return {"deleted_count": self.cursor.rowcount, "error": False}
+        except sqlite3.Error as e:
+            return {"deleted_count": 0, "error": True, "message": str(e)}
 
     def get_criterion(self, criterion_text: str) -> dict:
         """Получить критерий по тексту."""
@@ -531,6 +551,15 @@ class SQLAlchemyDB(DB):
 
         # Создаем таблицы
         Base.metadata.create_all(bind=self.engine)
+
+        # Миграция: добавить колонку language в rooms если её нет
+        inspector = inspect(self.engine)
+        if 'rooms' in inspector.get_table_names():
+            rooms_columns = {col['name'] for col in inspector.get_columns('rooms')}
+            if 'language' not in rooms_columns:
+                with self.engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE rooms ADD COLUMN language TEXT NOT NULL DEFAULT ''"))
+                    conn.commit()
 
     def get_session(self):
         """Получить сессию БД."""
@@ -732,7 +761,7 @@ class SQLAlchemyDB(DB):
             session.close()
 
     def create_room(self, creator_id: int, name: str, description: str = "",
-                    criteria: list = None) -> dict:
+                    language: str = "", criteria: list = None) -> dict:
         """Создать комнату."""
         from ..models.orm import Room
 
@@ -742,6 +771,7 @@ class SQLAlchemyDB(DB):
                 name=name,
                 creator_id=creator_id,
                 description=description,
+                language=language,
                 criteria=criteria or []
             )
             session.add(new_room)
@@ -756,13 +786,15 @@ class SQLAlchemyDB(DB):
 
     @staticmethod
     def _normalize_criteria(raw: list) -> list:
-        """Привести критерии к формату [{criterion_text, is_ai_verified}]."""
+        """Привести критерии к формату [{criterion_text, is_ai_verified}], пропуская пустые."""
         result = []
         for c in raw:
             if isinstance(c, str):
-                result.append({"criterion_text": c, "is_ai_verified": False})
+                if c:
+                    result.append({"criterion_text": c, "is_ai_verified": False})
             else:
-                result.append(c)
+                if c.get("criterion_text"):
+                    result.append(c)
         return result
 
     def get_room(self, room_id: str) -> dict:
@@ -782,6 +814,7 @@ class SQLAlchemyDB(DB):
                     "name": room.name,
                     "creator_id": room.creator_id,
                     "description": room.description,
+                    "language": room.language or "",
                     "criteria": self._normalize_criteria(room.criteria or []),
                     "created_at": room.created_at.isoformat() if room.created_at else None,
                     "participant_count": room.participant_count
@@ -806,6 +839,7 @@ class SQLAlchemyDB(DB):
                         "name": room.name,
                         "creator_id": room.creator_id,
                         "description": room.description,
+                        "language": room.language or "",
                         "criteria": self._normalize_criteria(room.criteria or []),
                         "created_at": room.created_at.isoformat() if room.created_at else None,
                         "participant_count": room.participant_count
@@ -834,6 +868,21 @@ class SQLAlchemyDB(DB):
         except Exception as e:
             session.rollback()
             return {"success": False, "error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def delete_user_rooms(self, user_id: int) -> dict:
+        """Удалить все комнаты пользователя (criteria_room удаляются каскадно)."""
+        from ..models.orm import Room
+
+        session = self.get_session()
+        try:
+            deleted_count = session.query(Room).filter(Room.creator_id == user_id).delete(synchronize_session=False)
+            session.commit()
+            return {"deleted_count": deleted_count, "error": False}
+        except Exception as e:
+            session.rollback()
+            return {"deleted_count": 0, "error": True, "message": str(e)}
         finally:
             session.close()
 

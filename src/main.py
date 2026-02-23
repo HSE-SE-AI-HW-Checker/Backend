@@ -44,6 +44,7 @@ async def create_room(room_data: RoomCreate, current_user: dict = Depends(get_cu
         creator_id=current_user["user_id"],
         name=room_data.name,
         description=room_data.description,
+        language=room_data.language,
         criteria=[c.model_dump() for c in room_data.criteria],
     )
     if result.get("error"):
@@ -63,6 +64,15 @@ async def create_room(room_data: RoomCreate, current_user: dict = Depends(get_cu
 
     room = server_instance.db.get_room(room_id)
     return room["room"]
+
+
+@app.delete("/rooms", summary="[dev only] Удалить все комнаты текущего пользователя")
+async def delete_user_rooms(current_user: dict = Depends(get_current_user)):
+    """Удалить все комнаты текущего пользователя вместе с записями criteria_room."""
+    result = server_instance.db.delete_user_rooms(current_user["user_id"])
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=result["message"])
+    return {"deleted_count": result["deleted_count"]}
 
 
 @app.get("/rooms", response_model=List[RoomResponse], summary="[dev only] Получить все комнаты пользователя")
