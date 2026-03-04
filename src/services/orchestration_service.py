@@ -89,8 +89,6 @@ class BigBoss:
   def audit(self, requirements: Dict[str, int], project: FolderStructure) -> str:
     processed_reqs = ''
     req_list = self._check_requirements(list(requirements.keys()))
-    
-    return '\n\n'.join(req_list)
 
     # Словарь для сбора всех назначений: {req_index: role}
     all_assignments = {}
@@ -139,7 +137,6 @@ class BigBoss:
       # Для совместимости со старым возвратом (хотя он нам уже не нужен в таком виде)
       # last_answer_str = BigBoss._increase_indices(parsed_json_str, i)
       # processed_reqs += last_answer_str
-      pass
 
     # Теперь у нас есть all_assignments {global_index: role}
     # Запускаем специалистов
