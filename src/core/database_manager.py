@@ -296,7 +296,15 @@ class SQLAlchemyDB(DB):
             database_url: URL подключения к БД. Если None, берется из конфига.
         """
         from .database import get_engine, get_session_maker, Base
-        from ..models.orm import User, Session
+        # Импорт всех ORM‑моделей для регистрации в metadata.create_all
+        from ..models.orm import (  # noqa: F401
+            User,
+            Session,
+            Room,
+            RoomCriterion,
+            RoomMembership,
+            RoomVisit,
+        )
         from .config_manager import get_from_config
 
         if database_url is None:

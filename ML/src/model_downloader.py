@@ -139,9 +139,7 @@ class ModelDownloader:
                 repo_id=repo_id,
                 filename=filename,
                 local_dir=str(self.models_dir),
-                local_dir_use_symlinks=False,  # Копируем файл, а не создаем симлинк
                 token=token,
-                resume_download=True  # Поддержка возобновления загрузки
             )
             
             if self.logger:

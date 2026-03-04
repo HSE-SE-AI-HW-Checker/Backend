@@ -130,7 +130,6 @@ def get_specialist_prompt(role: str, requirement: str, project_structure: str, p
 
 ФОРМАТ ОТВЕТА:
 {{
-  "requirement_text": "Использование паттернов проектирования...",
   "score": 5,
   "max_score": 10,
   "justification": "Обнаружен паттерн Singleton в файле src/db.py (класс Database). Паттерн Factory в src/utils.py реализован с ошибкой (нарушен принцип OCP).",

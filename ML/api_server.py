@@ -7,6 +7,11 @@ FastAPI сервер для локального запуска ИИ модел�
 import sys
 import asyncio
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Токены и секреты бэкенда: Backend/.env (родитель текущего каталога ML)
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 from typing import Optional, AsyncIterator
 from contextlib import asynccontextmanager
 

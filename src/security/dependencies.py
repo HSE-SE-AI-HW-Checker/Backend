@@ -2,6 +2,8 @@
 FastAPI Dependencies для аутентификации.
 """
 
+from typing import Optional
+
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
@@ -14,6 +16,7 @@ from ..core.database_manager import SQLite
 
 
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
@@ -105,3 +108,50 @@ async def get_current_user(
             detail="Невалидный токен",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+async def get_optional_current_user(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security),
+) -> Optional[dict]:
+    """
+    Как get_current_user, но без Bearer возвращает None;
+    при невалидном токене также None (эндпоинт трактует запрос как анонимный).
+    """
+    if credentials is None:
+        return None
+    token = credentials.credentials
+    try:
+        server = request.app.state.server
+        config = server.config
+        db = server.db
+    except AttributeError:
+        return None
+
+    try:
+        payload = decode_token(
+            token,
+            config.jwt_secret_key,
+            config.jwt_algorithm,
+        )
+
+        user_id = payload.get("user_id")
+        email = payload.get("email")
+
+        if user_id is None or email is None:
+            return None
+
+        validation_result = db.validate_token(token)
+
+        if not validation_result.get("valid", False):
+            return None
+
+        return {
+            "user_id": user_id,
+            "email": email,
+            "username": validation_result.get("username"),
+            "session_id": validation_result.get("session_id"),
+        }
+
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, Exception):
+        return None

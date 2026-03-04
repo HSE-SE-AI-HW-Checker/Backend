@@ -6,24 +6,26 @@ import uvicorn
 import os
 import signal
 import importlib
-from typing import Dict
-from fastapi import FastAPI, Request, Depends
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
-import requests
 
-from src.utils.helpers import parse_submitted_data
+from src.utils.helpers import BackendPath, parse_submitted_data
 from src.core.config_manager import get_ml_server_address
 from src.models.config import ServerConfig
-from src.services.file_processor import FolderStructure
-from src.services.orchestration_service import BigBoss
+from src.services.ml_payload_bounds import utf8_payload_size_bytes
+from src.services.orchestration_service import Orchestrator
+from src.services.langgraph_orchestration_service import LangGraphOrchestrator
 from src.security import get_current_user
-from src.core.prompts import get_audit_prompt
 from src.core.constants import DEFAULT_MOCK_RESPONSE
 from src.models.schemas import (
     User, BasicMessage, LogMessage, SignInResponse, SignUpResponse,
     LogoutResponse, SubmittedData, ModelResponse
 )
+
+from src.routers.rooms import router as rooms_router
 
 ALIASES = {
     "--port": "port",
@@ -58,6 +60,7 @@ class Server:
     
     def _init_config_logger_db(self):
         """Инициализация конфигурации, логгера и базы данных."""
+        load_dotenv(str(BackendPath('.env')))
         self.config = ServerConfig.from_config_name(self.config)
         
         from src.utils.logger import Logger
@@ -90,10 +93,10 @@ class Server:
         self.app.state.server = self
 
         self._setup_handlers()
-    
+
     def _setup_handlers(self):
         """Настройка обработчиков HTTP запросов."""
-        
+
         @self.app.get("/health")
         async def health_check():
             """
@@ -107,7 +110,7 @@ class Server:
                 "timestamp": datetime.now().isoformat(),
                 "version": "1.0.0"
             }
-        
+
         @self.app.post("/log", response_model=BasicMessage)
         async def log(log_data: LogMessage):
             """
@@ -299,21 +302,42 @@ class Server:
                 dict: Ответ от ML сервера
             """
 
-            boss = BigBoss(get_ml_server_address())
             project_data = parse_submitted_data(submitted_data)
             if not project_data:
-                return {
-                    "text": DEFAULT_MOCK_RESPONSE,
-                    "prompt": "Some random prompt"
-                }
+                return ModelResponse(text=DEFAULT_MOCK_RESPONSE)
 
-            response = boss.audit(submitted_data.requirements, project_data)
+            size_bytes = utf8_payload_size_bytes(project_data)
+            max_bytes = int(getattr(self.config, 'ml_input_max_bytes', 0) or 0)
+            if max_bytes > 0 and size_bytes > max_bytes:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Объём текста проекта после нормализации ({size_bytes} байт) "
+                        f"превышает допустимый лимит ({max_bytes} байт)."
+                    ),
+                )
 
+            warn_frac = float(getattr(self.config, 'ml_input_warn_fraction', 0.5) or 0.0)
+            if max_bytes > 0 and warn_frac > 0:
+                warn_threshold = max(1, int(max_bytes * warn_frac))
+                if size_bytes >= warn_threshold:
+                    self.logger.log(
+                        f"WARNING: объём входных текстовых данных для модели {size_bytes} байт "
+                        f"(лимит {max_bytes}). Возможна нехватка контекста; при сбоях стоит увеличить n_ctx или сократить проект."
+                    )
 
+            ml_url = get_ml_server_address()
+            try:
+                orchestrator_primary = LangGraphOrchestrator(ml_url)
+                response = orchestrator_primary.audit(submitted_data.requirements, project_data)
+            except Exception as exc:
+                self.logger.log(f"LangGraph audit failed, fallback to Orchestrator: {exc}")
+                legacy_orchestrator = Orchestrator(ml_url)
+                response = legacy_orchestrator.audit(submitted_data.requirements, project_data)
 
-            return ModelResponse(
-                text=response,
-            )
+            return ModelResponse(text=response)
+
+        self.app.include_router(rooms_router)
 
     def run(self):
         """Запустить сервер."""

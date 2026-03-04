@@ -18,9 +18,12 @@ def send_submit_request():
 
     try:
         response = requests.post(url + 'sign_in', headers=headers, json=payload)
+        if response.json()['error'] == True:
+            response = requests.post(url + 'sign_up', headers=headers, json=payload)
         response.raise_for_status()
 
         response_data = response.json()
+
 
         if 'access_token' in response_data:
             token = response_data['access_token']

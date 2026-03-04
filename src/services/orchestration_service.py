@@ -1,13 +1,14 @@
 import json
 import logging
-import requests 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
+
 from src.core.prompts import (
-  get_orchestrator_prompt,
-  get_specialist_prompt,
-  get_requirement_evaluation_prompt
+    get_orchestrator_prompt,
+    get_specialist_prompt,
 )
+from src.services.criterion_ai_gate import can_ai_verify_single_criterion
 from src.services.file_processor import FolderStructure
+from src.services.ml_client import ml_generate_non_stream
 
 logger = logging.getLogger(__name__)
 MOCK_RESPONSE = {
@@ -15,7 +16,7 @@ MOCK_RESPONSE = {
 }
 
 
-class BigBoss:
+class Orchestrator:
   def __init__(self, url):
     self.url = url
     self.prompt_cnt = 0
@@ -25,24 +26,21 @@ class BigBoss:
       self.prompt_cnt += 1
       with open(f'logs/prompt{self.prompt_cnt}', 'w') as f:
         f.write(prompt)
-      response = requests.post(
-        f'{self.url}/generate',
-        json={
-          "prompt": prompt,
-          "temperature": temperature,
-          "stream": False,
-          "max_tokens": max_tokens,
-        },
-        headers={'Content-Type': 'application/json'},
+      text_out = ml_generate_non_stream(
+          self.url,
+          prompt,
+          temperature=temperature,
+          max_tokens=max_tokens,
+          timeout=120,
       )
       with open(f'logs/prompt{self.prompt_cnt}', 'a') as f:
         f.write(f"""
 Ответ модели:
-{response.json()['text']}
+{text_out}
 """)
-      return response.json()
-    except requests.RequestException as e:
-      logger.error(f'HTTP request failed {e}.')
+      return {"text": text_out}
+    except Exception as e:
+      logger.error('HTTP запрос к ML провалился: %s', e)
       return MOCK_RESPONSE
 
   @staticmethod
@@ -65,7 +63,7 @@ class BigBoss:
       for line in arr:
         parts = line.split(':', 1)
         if len(parts)  == 2:
-          parts[0] = str(int(BigBoss._only_digits(parts[0])) + increment)
+          parts[0] = str(int(Orchestrator._only_digits(parts[0])) + increment)
           answer += f'{parts[0]}: {parts[1]}'
         else:
           answer += line
@@ -77,20 +75,16 @@ class BigBoss:
   def _check_requirements(self, requirements: List[str]) -> List[str]:
     answer = []
     for requirement in requirements:
-      model_opinion = self._get_answer(
-        get_requirement_evaluation_prompt(requirement),
-        max_tokens=64,
-        temperature=0
-      )['text'].strip()
-      if model_opinion == "YES":
-         answer.append(requirement)
+      try:
+        if can_ai_verify_single_criterion(self.url, requirement):
+          answer.append(requirement)
+      except Exception as exc:
+        logger.error('Не удалось отфильтровать требование «%s…»: %s', requirement[:40], exc)
     return answer
 
   def audit(self, requirements: Dict[str, int], project: FolderStructure) -> str:
     processed_reqs = ''
     req_list = self._check_requirements(list(requirements.keys()))
-    
-    return '\n\n'.join(req_list)
 
     # Словарь для сбора всех назначений: {req_index: role}
     all_assignments = {}
@@ -104,7 +98,7 @@ class BigBoss:
         ), max_tokens=512, temperature=0.1)['text']
       
       # Парсим ответ оркестратора
-      parsed_json_str = BigBoss._parse_markdown_answer(last_answer)
+      parsed_json_str = Orchestrator._parse_markdown_answer(last_answer)
       # Убираем запятую в конце, если она есть, для валидного JSON (хотя _parse_markdown_answer добавляет её)
       # Но тут логика была странная: _parse_markdown_answer возвращает строку с запятой в конце.
       # Нам нужно собрать полный JSON из кусочков или парсить кусочки.
@@ -137,22 +131,23 @@ class BigBoss:
           continue
 
       # Для совместимости со старым возвратом (хотя он нам уже не нужен в таком виде)
-      # last_answer_str = BigBoss._increase_indices(parsed_json_str, i)
+      # last_answer_str = Orchestrator._increase_indices(parsed_json_str, i)
       # processed_reqs += last_answer_str
-      pass
 
     # Теперь у нас есть all_assignments {global_index: role}
     # Запускаем специалистов
     
     specialist_reports = []
     
-    # Преобразуем структуру проекта в строку для промпта
-    # Используем project.structure, если доступно, иначе строковое представление
-    project_structure_str = str(project.structure) if hasattr(project, 'structure') else str(project)
-    
-    # Собираем контент файлов
-    # В FolderStructure ожидается словарь files_content или подобное
-    project_files_str = str(project.files_content) if hasattr(project, 'files_content') else "File content not available"
+    project_structure_str = str(project)
+    project_files_str = ""
+    if hasattr(project, 'get_files_content'):
+      try:
+        project_files_str = project.get_files_content() or ""
+      except Exception:
+        project_files_str = ""
+    elif hasattr(project, 'file_contents'):
+      project_files_str = str(getattr(project, 'file_contents', {}))
 
     for idx, role in all_assignments.items():
         # Индекс 1-based в all_assignments (из-за логики +1 в _increase_indices и промпта)

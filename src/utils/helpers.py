@@ -5,9 +5,11 @@
 import os
 import sys
 import importlib
-from pathlib import Path
+from typing import Optional
+
 from src.services.github_service import GitHubRepoExplorer
 from src.services.archive_service import ArchiveProcessor
+from src.services.languages_catalog import LanguagesCatalog
 
 class BackendPath:
     """
@@ -56,6 +58,18 @@ class MLPath(BackendPath):
     
     def __init__(self, path_from_root=''):
         self.path = BackendPath(f'ML/{path_from_root}')
+
+
+_language_catalog_store: dict[str, LanguagesCatalog] = {}
+
+
+def get_languages_catalog(relative_path: str = "available_languages.json") -> LanguagesCatalog:
+    """Единственный источник списков расширений (кэшируется в памяти по относительному пути)."""
+    if relative_path not in _language_catalog_store:
+        _language_catalog_store[relative_path] = LanguagesCatalog.load(
+            str(BackendPath(relative_path))
+        )
+    return _language_catalog_store[relative_path]
 
 
 def get_implementation(module_name: str, class_name: str):
@@ -110,7 +124,7 @@ def parse_args(args: list) -> dict:
     return ans
 
 
-def parse_submitted_data(submitted_data):
+def parse_submitted_data(submitted_data, *, language_key: Optional[str] = None):
     """
     Парсинг данных, отправленных на сервер.
     
@@ -120,6 +134,11 @@ def parse_submitted_data(submitted_data):
     Returns:
         Данные в формате, который может обработать ML (скорее всего base64 encoded)
     """
+    catalog = get_languages_catalog("available_languages.json")
+    whitelist_dots = catalog.whitelist_for_language(
+        language_key.strip().lower() if isinstance(language_key, str) and language_key.strip() else None
+    )
+
     # Чтобы не отвравлять сообщение на МЛ сервер
     if submitted_data.data_type == -1:
         return None
@@ -129,14 +148,14 @@ def parse_submitted_data(submitted_data):
             from dotenv import load_dotenv
             load_dotenv()
             token = os.getenv("GITHUB_TOKEN")
-            explorer = GitHubRepoExplorer(token=token, whitelist=['.cpp', '.h', '.hpp', '.py', '.txt', '.java'])
+            explorer = GitHubRepoExplorer(token=token, whitelist=whitelist_dots)
             return explorer.get_repo_contents(submitted_data.data)
         except Exception:
             return None
-    # Архив 
+    # Архив
     elif submitted_data.data_type == 1:
         try:
-            processor = ArchiveProcessor(whitelist=['.cpp', '.h', '.hpp', '.py', '.txt'])
+            processor = ArchiveProcessor(whitelist=whitelist_dots)
             return processor.process_base64_archive(submitted_data.data)
         except Exception:
             return None

@@ -3,6 +3,8 @@
 Загружает и валидирует параметры из YAML файла.
 """
 
+import os
+
 import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -122,11 +124,14 @@ class ConfigManager:
 
         # Парсим конфигурацию загрузки
         download_cfg = source_config['download']
+        yaml_token = download_cfg.get('token')
+        env_token = os.getenv('HF_TOKEN') or os.getenv('HUGGINGFACE_HUB_TOKEN')
+        token_final = env_token if env_token else yaml_token
         self._download_config = DownloadConfig(
             repo_id=download_cfg['repo_id'],
             filename=download_cfg['filename'],
             auto_download=download_cfg.get('auto_download', True),
-            token=download_cfg.get('token')
+            token=token_final,
         )
         
         model_cfg = source_config['model']
