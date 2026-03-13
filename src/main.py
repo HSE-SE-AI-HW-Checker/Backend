@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse
 from .core.server import Server
 from .models.schemas import (
     CriterionRecord, CriterionRoomRecord, CriterionVerifyRequest, CriterionVerifyResponse,
-    LanguageCreate, RoomCreate, RoomResponse,
+    JoinRoomRequest, LanguageCreate, OwnerScoreUpdate, RoomCreate, RoomMemberResponse, RoomResponse,
 )
 from .security import get_current_user
 
@@ -85,10 +85,10 @@ async def delete_user_rooms(current_user: dict = Depends(get_current_user)):
     return {"deleted_count": result["deleted_count"]}
 
 
-@app.get("/rooms", response_model=List[RoomResponse], summary="[dev only] Получить все комнаты пользователя")
+@app.get("/rooms", response_model=List[RoomResponse], summary="Получить все комнаты пользователя")
 async def get_user_rooms(current_user: dict = Depends(get_current_user)):
-    """Получить все комнаты текущего пользователя."""
-    result = server_instance.db.get_user_rooms(current_user["user_id"])
+    """Получить все комнаты пользователя: созданные им и те, в которые он вступил."""
+    result = server_instance.db.get_all_user_rooms(current_user["user_id"])
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["message"])
     return result["rooms"]
@@ -170,6 +170,69 @@ async def delete_language(language: str, _: dict = Depends(get_current_user)):
     if result.get("error"):
         raise HTTPException(status_code=404, detail=result["message"])
     return {"language": language}
+
+
+@app.post("/rooms/{room_id}/join", response_model=RoomMemberResponse)
+async def join_room(room_id: str, data: JoinRoomRequest, current_user: dict = Depends(get_current_user)):
+    """Вступить в комнату."""
+    room = server_instance.db.get_room(room_id)
+    if room.get("error") or room["room"] is None:
+        raise HTTPException(status_code=404, detail=f"Комната '{room_id}' не найдена")
+    if room["room"]["password"] != data.password:
+        raise HTTPException(status_code=403, detail="Неверный пароль комнаты")
+
+    result = server_instance.db.join_room(current_user["user_id"], room_id)
+    if result.get("error"):
+        raise HTTPException(status_code=400, detail=result["message"])
+
+    member = server_instance.db.get_room_member(current_user["user_id"], room_id)
+    if member.get("error"):
+        raise HTTPException(status_code=500, detail=member["message"])
+    return member["member"]
+
+
+@app.get("/rooms/{room_id}/members", response_model=List[RoomMemberResponse])
+async def get_room_members(room_id: str, _: dict = Depends(get_current_user)):
+    """Получить список участников комнаты."""
+    result = server_instance.db.get_room_members(room_id)
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=result["message"])
+    return result["members"]
+
+
+@app.get("/rooms/{room_id}/members/me", response_model=RoomMemberResponse)
+async def get_my_room_member(room_id: str, current_user: dict = Depends(get_current_user)):
+    """Получить свою запись в комнате."""
+    result = server_instance.db.get_room_member(current_user["user_id"], room_id)
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=result["message"])
+    if result["member"] is None:
+        raise HTTPException(status_code=404, detail="Вы не являетесь участником этой комнаты")
+    return result["member"]
+
+
+@app.patch("/rooms/{room_id}/members/{user_id}/score", response_model=RoomMemberResponse)
+async def update_member_score(
+    room_id: str,
+    user_id: int,
+    data: OwnerScoreUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Выставить оценку участнику (только владелец комнаты)."""
+    room = server_instance.db.get_room(room_id)
+    if room.get("error") or room["room"] is None:
+        raise HTTPException(status_code=404, detail=f"Комната '{room_id}' не найдена")
+    if room["room"]["creator_id"] != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Только владелец комнаты может выставлять оценки")
+
+    result = server_instance.db.update_owner_score(user_id, room_id, data.owner_score)
+    if result.get("error"):
+        raise HTTPException(status_code=404, detail=result["message"])
+
+    member = server_instance.db.get_room_member(user_id, room_id)
+    if member.get("error"):
+        raise HTTPException(status_code=500, detail=member["message"])
+    return member["member"]
 
 
 @app.get("/info")

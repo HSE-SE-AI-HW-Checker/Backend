@@ -1,0 +1,152 @@
+import sqlite3
+
+
+def _sqlite_row_to_member(row) -> dict:
+    return {
+        "user_id": row[0],
+        "room_id": row[1],
+        "ai_score": row[2],
+        "final_score": row[3],
+        "owner_score": row[4],
+        "last_visit": str(row[5]),
+        "submissions_count": row[6],
+    }
+
+
+class SQLiteRoomMembersMixin:
+
+    def join_room(self, user_id: int, room_id: str) -> dict:
+        try:
+            self.cursor.execute(
+                "INSERT INTO room_members (user_id, room_id) VALUES (?, ?)",
+                (user_id, room_id),
+            )
+            self.connection.commit()
+            return {"error": False}
+        except sqlite3.IntegrityError as e:
+            msg = str(e)
+            if "UNIQUE" in msg or "PRIMARY KEY" in msg:
+                return {"error": True, "message": "Пользователь уже является участником комнаты"}
+            return {"error": True, "message": msg}
+        except sqlite3.Error as e:
+            return {"error": True, "message": str(e)}
+
+    def get_room_member(self, user_id: int, room_id: str) -> dict:
+        try:
+            self.cursor.execute(
+                "SELECT user_id, room_id, ai_score, final_score, owner_score, last_visit, submissions_count "
+                "FROM room_members WHERE user_id = ? AND room_id = ?",
+                (user_id, room_id),
+            )
+            row = self.cursor.fetchone()
+            if row is None:
+                return {"member": None, "error": False}
+            return {"member": _sqlite_row_to_member(row), "error": False}
+        except sqlite3.Error as e:
+            return {"member": None, "error": True, "message": str(e)}
+
+    def get_room_members(self, room_id: str) -> dict:
+        try:
+            self.cursor.execute(
+                "SELECT user_id, room_id, ai_score, final_score, owner_score, last_visit, submissions_count "
+                "FROM room_members WHERE room_id = ?",
+                (room_id,),
+            )
+            rows = self.cursor.fetchall()
+            return {"members": [_sqlite_row_to_member(r) for r in rows], "error": False}
+        except sqlite3.Error as e:
+            return {"members": [], "error": True, "message": str(e)}
+
+    def update_owner_score(self, user_id: int, room_id: str, owner_score: float) -> dict:
+        try:
+            self.cursor.execute(
+                "UPDATE room_members SET owner_score = ? WHERE user_id = ? AND room_id = ?",
+                (owner_score, user_id, room_id),
+            )
+            self.connection.commit()
+            if self.cursor.rowcount == 0:
+                return {"error": True, "message": "Участник комнаты не найден"}
+            return {"error": False}
+        except sqlite3.Error as e:
+            return {"error": True, "message": str(e)}
+
+
+class SARoomMembersMixin:
+
+    def join_room(self, user_id: int, room_id: str) -> dict:
+        from ...models.orm import RoomMember
+        from sqlalchemy.exc import IntegrityError
+
+        session = self.get_session()
+        try:
+            session.add(RoomMember(user_id=user_id, room_id=room_id))
+            session.commit()
+            return {"error": False}
+        except IntegrityError:
+            session.rollback()
+            return {"error": True, "message": "Пользователь уже является участником комнаты"}
+        except Exception as e:
+            session.rollback()
+            return {"error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def get_room_member(self, user_id: int, room_id: str) -> dict:
+        from ...models.orm import RoomMember
+
+        session = self.get_session()
+        try:
+            member = session.query(RoomMember).filter(
+                RoomMember.user_id == user_id,
+                RoomMember.room_id == room_id,
+            ).first()
+            if member is None:
+                return {"member": None, "error": False}
+            return {"member": _sa_member_to_dict(member), "error": False}
+        except Exception as e:
+            return {"member": None, "error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def get_room_members(self, room_id: str) -> dict:
+        from ...models.orm import RoomMember
+
+        session = self.get_session()
+        try:
+            members = session.query(RoomMember).filter(RoomMember.room_id == room_id).all()
+            return {"members": [_sa_member_to_dict(m) for m in members], "error": False}
+        except Exception as e:
+            return {"members": [], "error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def update_owner_score(self, user_id: int, room_id: str, owner_score: float) -> dict:
+        from ...models.orm import RoomMember
+
+        session = self.get_session()
+        try:
+            updated = session.query(RoomMember).filter(
+                RoomMember.user_id == user_id,
+                RoomMember.room_id == room_id,
+            ).update({"owner_score": owner_score})
+            session.commit()
+            if updated == 0:
+                return {"error": True, "message": "Участник комнаты не найден"}
+            return {"error": False}
+        except Exception as e:
+            session.rollback()
+            return {"error": True, "message": str(e)}
+        finally:
+            session.close()
+
+
+def _sa_member_to_dict(member) -> dict:
+    return {
+        "user_id": member.user_id,
+        "room_id": member.room_id,
+        "ai_score": member.ai_score,
+        "final_score": member.final_score,
+        "owner_score": member.owner_score,
+        "last_visit": str(member.last_visit),
+        "submissions_count": member.submissions_count,
+    }

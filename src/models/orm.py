@@ -5,7 +5,7 @@ ORM модели базы данных.
 import random
 import string
 
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Text, JSON, TIMESTAMP
+from sqlalchemy import Column, Integer, String, Boolean, Float, ForeignKey, Text, JSON, TIMESTAMP
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from ..core.database import Base
@@ -16,6 +16,12 @@ def generate_room_id() -> str:
     chars = string.ascii_uppercase + string.digits
     parts = [''.join(random.choices(chars, k=4)) for _ in range(3)]
     return '-'.join(parts)
+
+
+def generate_room_password() -> str:
+    """Генерация пароля комнаты: 8 символов (буквы + цифры)."""
+    chars = string.ascii_uppercase + string.digits
+    return ''.join(random.choices(chars, k=8))
 
 class User(Base):
     """Модель пользователя."""
@@ -60,6 +66,7 @@ class Room(Base):
     criteria = Column(JSON, nullable=False, default=list)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
     participant_count = Column(Integer, nullable=False, default=0)
+    password = Column(String, nullable=False, default=generate_room_password)
 
     # Связь с создателем
     creator = relationship("User", back_populates="rooms")
@@ -87,3 +94,16 @@ class CriterionRoom(Base):
     criterion_text = Column(String, ForeignKey("criteria.criterion_text", ondelete="CASCADE"), primary_key=True)
     room_id = Column(String, ForeignKey("rooms.id", ondelete="CASCADE"), primary_key=True)
     can_ai_verified = Column(Boolean, nullable=False, default=False)
+
+
+class RoomMember(Base):
+    """Участник комнаты."""
+    __tablename__ = "room_members"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    room_id = Column(String, ForeignKey("rooms.id", ondelete="CASCADE"), primary_key=True)
+    ai_score = Column(Float, nullable=True)
+    final_score = Column(Float, nullable=True)
+    owner_score = Column(Float, nullable=True)
+    last_visit = Column(TIMESTAMP, nullable=False, server_default=func.now())
+    submissions_count = Column(Integer, nullable=False, default=0)

@@ -62,7 +62,7 @@ class RoomCreate(BaseModel):
     description: str = Field(..., min_length=1, description="Описание комнаты (не может быть пустым)")
     language: str = Field(..., min_length=1, description="Язык программирования (не может быть пустым)")
     criteria: List[Criterion] = Field(
-        default=[],
+        min_length=1,
         description=(
             "Список критериев проверки. Каждый элемент — объект с полями:\n"
             "- **criterion_text** (str): текст критерия;\n"
@@ -82,6 +82,12 @@ class RoomResponse(BaseModel):
     criteria: List[Criterion]
     created_at: str
     participant_count: int
+    password: str
+
+
+class JoinRoomRequest(BaseModel):
+    """Запрос на вступление в комнату."""
+    password: str = Field(..., min_length=1, description="Пароль комнаты")
 
 
 class CriterionRecord(BaseModel):
@@ -110,6 +116,22 @@ class CriterionVerifyRequest(BaseModel):
 class CriterionVerifyResponse(BaseModel):
     """Ответ на верификацию критерия."""
     can_ai_verified: bool
+
+
+class OwnerScoreUpdate(BaseModel):
+    """Запрос на обновление оценки владельца."""
+    owner_score: float = Field(..., ge=0, le=100, description="Оценка от владельца комнаты (0–100)")
+
+
+class RoomMemberResponse(BaseModel):
+    """Ответ с данными участника комнаты."""
+    user_id: int
+    room_id: str
+    ai_score: Optional[float] = None
+    final_score: Optional[float] = None
+    owner_score: Optional[float] = None
+    last_visit: str
+    submissions_count: int
 
 
 class ModelResponse(BaseModel):
