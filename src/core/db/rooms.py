@@ -44,8 +44,11 @@ class SQLiteRoomsMixin:
 
         try:
             self.cursor.execute("""
-                SELECT id, name, creator_id, description, language, criteria, created_at, participant_count, password
-                FROM rooms WHERE id = ?
+                SELECT r.id, r.name, r.creator_id, r.description, r.language, r.criteria,
+                       r.created_at, r.participant_count, r.password, u.username
+                FROM rooms r
+                JOIN users u ON r.creator_id = u.id
+                WHERE r.id = ?
             """, (room_id,))
             result = self.cursor.fetchone()
 
@@ -63,6 +66,7 @@ class SQLiteRoomsMixin:
                     "created_at": result[6],
                     "participant_count": result[7],
                     "password": result[8] or "",
+                    "creator_name": result[9] or "",
                 },
                 "error": False
             }
@@ -74,9 +78,12 @@ class SQLiteRoomsMixin:
 
         try:
             self.cursor.execute("""
-                SELECT id, name, creator_id, description, language, criteria, created_at, participant_count, password
-                FROM rooms WHERE creator_id = ?
-                ORDER BY created_at DESC
+                SELECT r.id, r.name, r.creator_id, r.description, r.language, r.criteria,
+                       r.created_at, r.participant_count, r.password, u.username
+                FROM rooms r
+                JOIN users u ON r.creator_id = u.id
+                WHERE r.creator_id = ?
+                ORDER BY r.created_at DESC
             """, (user_id,))
             rows = self.cursor.fetchall()
 
@@ -91,6 +98,7 @@ class SQLiteRoomsMixin:
                     "created_at": row[6],
                     "participant_count": row[7],
                     "password": row[8] or "",
+                    "creator_name": row[9] or "",
                 }
                 for row in rows
             ]
@@ -104,12 +112,16 @@ class SQLiteRoomsMixin:
 
         try:
             self.cursor.execute("""
-                SELECT id, name, creator_id, description, language, criteria, created_at, participant_count, password
-                FROM rooms WHERE creator_id = ?
+                SELECT r.id, r.name, r.creator_id, r.description, r.language, r.criteria,
+                       r.created_at, r.participant_count, r.password, u.username
+                FROM rooms r
+                JOIN users u ON r.creator_id = u.id
+                WHERE r.creator_id = ?
                 UNION
                 SELECT r.id, r.name, r.creator_id, r.description, r.language, r.criteria,
-                       r.created_at, r.participant_count, r.password
+                       r.created_at, r.participant_count, r.password, u.username
                 FROM rooms r
+                JOIN users u ON r.creator_id = u.id
                 JOIN room_members rm ON r.id = rm.room_id
                 WHERE rm.user_id = ? AND r.creator_id != ?
                 ORDER BY created_at DESC
@@ -127,6 +139,7 @@ class SQLiteRoomsMixin:
                     "created_at": row[6],
                     "participant_count": row[7],
                     "password": row[8] or "",
+                    "creator_name": row[9] or "",
                 }
                 for row in rows
             ]
@@ -184,20 +197,27 @@ class SARoomsMixin:
             session.close()
 
     def get_room(self, room_id: str) -> dict:
-        from ...models.orm import Room
+        from ...models.orm import Room, User
 
         session = self.get_session()
         try:
-            room = session.query(Room).filter(Room.id == room_id).first()
+            row = (
+                session.query(Room, User.username)
+                .join(User, Room.creator_id == User.id)
+                .filter(Room.id == room_id)
+                .first()
+            )
 
-            if room is None:
+            if row is None:
                 return {"error": True, "message": "Комната не найдена"}
 
+            room, creator_name = row
             return {
                 "room": {
                     "id": room.id,
                     "name": room.name,
                     "creator_id": room.creator_id,
+                    "creator_name": creator_name or "",
                     "description": room.description,
                     "language": room.language or "",
                     "criteria": _normalize_criteria(room.criteria or []),
@@ -211,20 +231,24 @@ class SARoomsMixin:
             session.close()
 
     def get_user_rooms(self, user_id: int) -> dict:
-        from ...models.orm import Room
+        from ...models.orm import Room, User
 
         session = self.get_session()
         try:
-            rooms = session.query(Room).filter(
-                Room.creator_id == user_id
-            ).order_by(Room.created_at.desc()).all()
-
+            rows = (
+                session.query(Room, User.username)
+                .join(User, Room.creator_id == User.id)
+                .filter(Room.creator_id == user_id)
+                .order_by(Room.created_at.desc())
+                .all()
+            )
             return {
                 "rooms": [
                     {
                         "id": room.id,
                         "name": room.name,
                         "creator_id": room.creator_id,
+                        "creator_name": creator_name or "",
                         "description": room.description,
                         "language": room.language or "",
                         "criteria": _normalize_criteria(room.criteria or []),
@@ -232,7 +256,7 @@ class SARoomsMixin:
                         "participant_count": room.participant_count,
                         "password": room.password or "",
                     }
-                    for room in rooms
+                    for room, creator_name in rows
                 ],
                 "error": False
             }
@@ -243,13 +267,14 @@ class SARoomsMixin:
 
     def get_all_user_rooms(self, user_id: int) -> dict:
         """Все комнаты пользователя: созданные им + те, в которые он вступил."""
-        from ...models.orm import Room, RoomMember
+        from ...models.orm import Room, RoomMember, User
         from sqlalchemy import or_
 
         session = self.get_session()
         try:
-            rooms = (
-                session.query(Room)
+            rows = (
+                session.query(Room, User.username)
+                .join(User, Room.creator_id == User.id)
                 .outerjoin(RoomMember, Room.id == RoomMember.room_id)
                 .filter(or_(Room.creator_id == user_id, RoomMember.user_id == user_id))
                 .distinct()
@@ -268,8 +293,9 @@ class SARoomsMixin:
                         "created_at": room.created_at.isoformat() if room.created_at else None,
                         "participant_count": room.participant_count,
                         "password": room.password or "",
+                        "creator_name": creator_name or "",
                     }
-                    for room in rooms
+                    for room, creator_name in rows
                 ],
                 "error": False,
             }

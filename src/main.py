@@ -12,7 +12,8 @@ from fastapi.responses import HTMLResponse
 from .core.server import Server
 from .models.schemas import (
     CriterionRecord, CriterionRoomRecord, CriterionVerifyRequest, CriterionVerifyResponse,
-    JoinRoomRequest, LanguageCreate, OwnerScoreUpdate, RoomCreate, RoomMemberResponse, RoomResponse,
+    JoinRoomRequest, LanguageCreate, OwnerScoreUpdate, RecentRoomResponse,
+    RoomCreate, RoomMemberResponse, RoomResponse, ScoresUpdate,
 )
 from .security import get_current_user
 
@@ -91,6 +92,15 @@ async def get_user_rooms(current_user: dict = Depends(get_current_user)):
     result = server_instance.db.get_all_user_rooms(current_user["user_id"])
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["message"])
+    return result["rooms"]
+
+
+@app.get("/rooms/recent", response_model=List[RecentRoomResponse], summary="Недавние комнаты пользователя")
+async def get_recent_rooms(current_user: dict = Depends(get_current_user)):
+    """Комнаты, в которых пользователь является участником, с полями last_visit, submissions_count, participant_count."""
+    result = server_instance.db.get_user_recent_rooms(current_user["user_id"])
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=result["message"])
     return result["rooms"]
 
 
@@ -226,6 +236,31 @@ async def update_member_score(
         raise HTTPException(status_code=403, detail="Только владелец комнаты может выставлять оценки")
 
     result = server_instance.db.update_owner_score(user_id, room_id, data.owner_score)
+    if result.get("error"):
+        raise HTTPException(status_code=404, detail=result["message"])
+
+    member = server_instance.db.get_room_member(user_id, room_id)
+    if member.get("error"):
+        raise HTTPException(status_code=500, detail=member["message"])
+    return member["member"]
+
+
+@app.patch("/rooms/{room_id}/members/{user_id}/scores", response_model=RoomMemberResponse, summary="[dev only] Выставить оценки участнику")
+async def update_member_scores(
+    room_id: str,
+    user_id: int,
+    data: ScoresUpdate,
+    _: dict = Depends(get_current_user),
+):
+    """[dev only] Выставить ai_score, final_score и/или owner_score участнику комнаты."""
+    result = server_instance.db.update_member_scores(
+        user_id, room_id,
+        ai_score=data.ai_score,
+        final_score=data.final_score,
+        owner_score=data.owner_score,
+        deadline=data.deadline,
+        submissions_count=data.submissions_count,
+    )
     if result.get("error"):
         raise HTTPException(status_code=404, detail=result["message"])
 

@@ -61,6 +61,15 @@ class SQLAlchemyDB(SAUsersMixin, SASessionsMixin, SARoomsMixin,
                         )
                 conn.commit()
 
+        # Миграция room_members: добавить deadline если нет
+        inspector = inspect(self.engine)
+        if 'room_members' in inspector.get_table_names():
+            rm_columns = {col['name'] for col in inspector.get_columns('room_members')}
+            if 'deadline' not in rm_columns:
+                with self.engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE room_members ADD COLUMN deadline TIMESTAMP"))
+                    conn.commit()
+
     def get_session(self):
         return self.SessionLocal()
 

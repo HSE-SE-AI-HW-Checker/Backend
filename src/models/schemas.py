@@ -77,6 +77,7 @@ class RoomResponse(BaseModel):
     id: str
     name: str
     creator_id: int
+    creator_name: str
     description: str
     language: str
     criteria: List[Criterion]
@@ -123,6 +124,15 @@ class OwnerScoreUpdate(BaseModel):
     owner_score: float = Field(..., ge=0, le=100, description="Оценка от владельца комнаты (0–100)")
 
 
+class ScoresUpdate(BaseModel):
+    """[dev only] Запрос на обновление оценок участника комнаты."""
+    ai_score: Optional[float] = Field(None, ge=0, le=100, description="Оценка от AI (0–100)")
+    final_score: Optional[float] = Field(None, ge=0, le=100, description="Итоговая оценка (0–100)")
+    owner_score: Optional[float] = Field(None, ge=0, le=100, description="Оценка от владельца (0–100)")
+    deadline: Optional[str] = Field(None, description="Дедлайн ISO 8601, например 2026-06-01T23:59:00")
+    submissions_count: Optional[int] = Field(None, ge=0, description="Количество отправленных решений")
+
+
 class RoomMemberResponse(BaseModel):
     """Ответ с данными участника комнаты."""
     user_id: int
@@ -132,6 +142,17 @@ class RoomMemberResponse(BaseModel):
     owner_score: Optional[float] = None
     last_visit: str
     submissions_count: int
+    deadline: Optional[str] = None
+
+
+class RecentRoomResponse(BaseModel):
+    """Недавняя комната пользователя (только ключевые поля)."""
+    room_id: str
+    room_name: str
+    last_visit: str
+    submissions_count: int
+    participant_count: int
+    final_score: Optional[float] = None
 
 
 class ModelResponse(BaseModel):

@@ -107,3 +107,4 @@ class RoomMember(Base):
     owner_score = Column(Float, nullable=True)
     last_visit = Column(TIMESTAMP, nullable=False, server_default=func.now())
     submissions_count = Column(Integer, nullable=False, default=0)
+    deadline = Column(TIMESTAMP, nullable=True)

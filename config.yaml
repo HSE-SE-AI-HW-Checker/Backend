@@ -1,7 +1,7 @@
 logger_implementation: SimpleLogger
 log_file_path: logs/server.log
 database_implementation: SQLAlchemyDB
-host: localhost
+host: 0.0.0.0
 port: 8000
 reload: true
 drop_db: false

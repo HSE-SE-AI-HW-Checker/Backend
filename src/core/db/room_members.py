@@ -10,6 +10,7 @@ def _sqlite_row_to_member(row) -> dict:
         "owner_score": row[4],
         "last_visit": str(row[5]),
         "submissions_count": row[6],
+        "deadline": str(row[7]) if row[7] is not None else None,
     }
 
 
@@ -34,7 +35,7 @@ class SQLiteRoomMembersMixin:
     def get_room_member(self, user_id: int, room_id: str) -> dict:
         try:
             self.cursor.execute(
-                "SELECT user_id, room_id, ai_score, final_score, owner_score, last_visit, submissions_count "
+                "SELECT user_id, room_id, ai_score, final_score, owner_score, last_visit, submissions_count, deadline "
                 "FROM room_members WHERE user_id = ? AND room_id = ?",
                 (user_id, room_id),
             )
@@ -48,7 +49,7 @@ class SQLiteRoomMembersMixin:
     def get_room_members(self, room_id: str) -> dict:
         try:
             self.cursor.execute(
-                "SELECT user_id, room_id, ai_score, final_score, owner_score, last_visit, submissions_count "
+                "SELECT user_id, room_id, ai_score, final_score, owner_score, last_visit, submissions_count, deadline "
                 "FROM room_members WHERE room_id = ?",
                 (room_id,),
             )
@@ -62,6 +63,54 @@ class SQLiteRoomMembersMixin:
             self.cursor.execute(
                 "UPDATE room_members SET owner_score = ? WHERE user_id = ? AND room_id = ?",
                 (owner_score, user_id, room_id),
+            )
+            self.connection.commit()
+            if self.cursor.rowcount == 0:
+                return {"error": True, "message": "Участник комнаты не найден"}
+            return {"error": False}
+        except sqlite3.Error as e:
+            return {"error": True, "message": str(e)}
+
+    def get_user_recent_rooms(self, user_id: int) -> dict:
+        try:
+            self.cursor.execute(
+                """
+                SELECT r.id, r.name, rm.last_visit, rm.submissions_count, r.participant_count, rm.final_score
+                FROM room_members rm
+                JOIN rooms r ON rm.room_id = r.id
+                WHERE rm.user_id = ?
+                ORDER BY rm.last_visit DESC
+                """,
+                (user_id,),
+            )
+            rows = self.cursor.fetchall()
+            return {
+                "rooms": [
+                    {
+                        "room_id": row[0],
+                        "room_name": row[1],
+                        "last_visit": str(row[2]),
+                        "submissions_count": row[3],
+                        "participant_count": row[4],
+                        "final_score": row[5],
+                    }
+                    for row in rows
+                ],
+                "error": False,
+            }
+        except sqlite3.Error as e:
+            return {"rooms": [], "error": True, "message": str(e)}
+
+    def update_member_scores(self, user_id: int, room_id: str, **scores) -> dict:
+        fields = {k: v for k, v in scores.items() if v is not None}
+        if not fields:
+            return {"error": True, "message": "Нет полей для обновления"}
+        set_clause = ", ".join(f"{k} = ?" for k in fields)
+        values = list(fields.values()) + [user_id, room_id]
+        try:
+            self.cursor.execute(
+                f"UPDATE room_members SET {set_clause} WHERE user_id = ? AND room_id = ?",
+                values,
             )
             self.connection.commit()
             if self.cursor.rowcount == 0:
@@ -139,6 +188,71 @@ class SARoomMembersMixin:
         finally:
             session.close()
 
+    def get_user_recent_rooms(self, user_id: int) -> dict:
+        from ...models.orm import RoomMember, Room
+
+        session = self.get_session()
+        try:
+            rows = (
+                session.query(
+                    Room.id,
+                    Room.name,
+                    RoomMember.last_visit,
+                    RoomMember.submissions_count,
+                    Room.participant_count,
+                    RoomMember.final_score,
+                )
+                .join(Room, RoomMember.room_id == Room.id)
+                .filter(RoomMember.user_id == user_id)
+                .order_by(RoomMember.last_visit.desc())
+                .all()
+            )
+            return {
+                "rooms": [
+                    {
+                        "room_id": row[0],
+                        "room_name": row[1],
+                        "last_visit": row[2].isoformat() if row[2] else str(row[2]),
+                        "submissions_count": row[3],
+                        "participant_count": row[4],
+                        "final_score": row[5],
+                    }
+                    for row in rows
+                ],
+                "error": False,
+            }
+        except Exception as e:
+            return {"rooms": [], "error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def update_member_scores(self, user_id: int, room_id: str, **scores) -> dict:
+        from ...models.orm import RoomMember
+        from datetime import datetime
+
+        fields = {k: v for k, v in scores.items() if v is not None}
+        if not fields:
+            return {"error": True, "message": "Нет полей для обновления"}
+
+        if "deadline" in fields and isinstance(fields["deadline"], str):
+            fields["deadline"] = datetime.fromisoformat(fields["deadline"])
+
+        session = self.get_session()
+        try:
+            updated = session.query(RoomMember).filter(
+                RoomMember.user_id == user_id,
+                RoomMember.room_id == room_id,
+            ).update(fields)
+            session.commit()
+            if updated == 0:
+                return {"error": True, "message": "Участник комнаты не найден"}
+            return {"error": False}
+        except Exception as e:
+            session.rollback()
+            return {"error": True, "message": str(e)}
+        finally:
+            session.close()
+
 
 def _sa_member_to_dict(member) -> dict:
     return {
@@ -149,4 +263,5 @@ def _sa_member_to_dict(member) -> dict:
         "owner_score": member.owner_score,
         "last_visit": str(member.last_visit),
         "submissions_count": member.submissions_count,
+        "deadline": member.deadline.isoformat() if member.deadline else None,
     }
