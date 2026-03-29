@@ -18,7 +18,7 @@ database_implementation: SQLAlchemyDB
 database_url: sqlite:///data/AppUsers.db
 
 # Хост сервера
-host: localhost
+host: 0.0.0.0
 
 # Порт сервера
 port: 8080
