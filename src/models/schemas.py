@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, List
-from datetime import datetime
 
 class User(BaseModel):
     """Модель пользователя."""
@@ -51,88 +50,112 @@ class SubmittedData(BaseModel):
     data_type: int
 
 
-class ModelResponse(BaseModel):
-    """Модель ответа для генерации текста (non-streaming)."""
-    
-    text: str = Field(..., description="Сгенерированный текст")
+class Criterion(BaseModel):
+    """Критерий проверки."""
+    criterion_text: str = Field(..., min_length=1, description="Текст критерия (не может быть пустым)")
+    is_ai_verified: bool
 
 
-# --- Комнаты и языки программирования (пояснительная записка) ---
+class RoomCreate(BaseModel):
+    """Данные для создания комнаты."""
+    name: str = Field(..., min_length=1, description="Название комнаты (не может быть пустым)")
+    description: str = Field(..., min_length=1, description="Описание комнаты (не может быть пустым)")
+    language: str = Field(..., min_length=1, description="Язык программирования (не может быть пустым)")
+    criteria: List[Criterion] = Field(
+        min_length=1,
+        description=(
+            "Список критериев проверки. Каждый элемент — объект с полями:\n"
+            "- **criterion_text** (str): текст критерия;\n"
+            "- **is_ai_verified** (bool): требует ли критерий проверки через AI "
+            "(если true — критерий должен быть предварительно верифицирован через POST /criteria/verify)."
+        )
+    )
 
 
-class LanguageRow(BaseModel):
+class RoomResponse(BaseModel):
+    """Ответ с данными комнаты."""
     id: str
     name: str
-    extensions: List[str] = Field(default_factory=list)
+    creator_id: int
+    creator_name: str
+    description: str
+    language: str
+    criteria: List[Criterion]
+    created_at: str
+    participant_count: int
+    password: str
 
 
-class LanguagesOutResponse(BaseModel):
-    languages: List[LanguageRow]
+class JoinRoomRequest(BaseModel):
+    """Запрос на вступление в комнату."""
+    password: str = Field(..., min_length=1, description="Пароль комнаты")
 
 
-class CreateRoomRequest(BaseModel):
-    name: str = Field(..., min_length=1)
-    description: str = ""
-    language: str = Field(..., min_length=1)
-    criteria: List[str] = Field(..., min_length=1)
-    password: str = Field(..., min_length=4)
-    deadline: Optional[datetime] = None
+class CriterionRecord(BaseModel):
+    """Запись критерия из таблицы criteria."""
+    criterion_text: str
+    ai_verified: bool
 
 
-class CreateRoomResponse(BaseModel):
+class CriterionRoomRecord(BaseModel):
+    """Запись из таблицы criteria_room."""
+    criterion_text: str
     room_id: str
-    name: str
-    created_at: datetime
-
-
-class CriteriaVerifyRequest(BaseModel):
-    criteria_text: str = Field(..., min_length=1)
-
-
-class CriteriaVerifyResponse(BaseModel):
     can_ai_verified: bool
 
 
-class RoomListItem(BaseModel):
-    id: str
-    name: str
-    description: str = ""
-    created_at: datetime
+class LanguageCreate(BaseModel):
+    """Запрос на добавление языка программирования."""
+    language: str = Field(..., min_length=1, description="Название языка программирования")
 
 
-class RecentRoomRow(BaseModel):
-    id: str
-    name: str
-    last_visited: datetime
+class CriterionVerifyRequest(BaseModel):
+    """Запрос на верификацию критерия."""
+    criterion_text: str = Field(..., min_length=1, description="Текст критерия (не может быть пустым)")
 
 
-class CriterionItem(BaseModel):
-    text: str
-    type: int = 0
+class CriterionVerifyResponse(BaseModel):
+    """Ответ на верификацию критерия."""
+    can_ai_verified: bool
 
 
-class RoomDetailOut(BaseModel):
-    id: str
-    name: str
-    description: str = ""
-    language: str
-    criteria: List[CriterionItem] = Field(default_factory=list)
-    created_at: Optional[datetime] = None
-    deadline: Optional[datetime] = None
+class OwnerScoreUpdate(BaseModel):
+    """Запрос на обновление оценки владельца."""
+    owner_score: float = Field(..., ge=0, le=100, description="Оценка от владельца комнаты (0–100)")
 
 
-class JoinRoomBody(BaseModel):
-    password: str = Field(..., min_length=1)
+class ScoresUpdate(BaseModel):
+    """[dev only] Запрос на обновление оценок участника комнаты."""
+    ai_score: Optional[float] = Field(None, ge=0, le=100, description="Оценка от AI (0–100)")
+    final_score: Optional[float] = Field(None, ge=0, le=100, description="Итоговая оценка (0–100)")
+    owner_score: Optional[float] = Field(None, ge=0, le=100, description="Оценка от владельца (0–100)")
+    deadline: Optional[str] = Field(None, description="Дедлайн ISO 8601, например 2026-06-01T23:59:00")
+    submissions_count: Optional[int] = Field(None, ge=0, description="Количество отправленных решений")
 
 
-class JoinRoomResponse(BaseModel):
-    success: bool
-    message: str
-    room: Optional[RoomDetailOut] = None
+class RoomMemberResponse(BaseModel):
+    """Ответ с данными участника комнаты."""
+    user_id: int
+    room_id: str
+    ai_score: Optional[float] = None
+    final_score: Optional[float] = None
+    owner_score: Optional[float] = None
+    last_visit: str
+    submissions_count: int
+    deadline: Optional[str] = None
 
 
-class MemberMeResponse(BaseModel):
-    user_id: str
-    joined_at: datetime
-    deadline: Optional[datetime] = None
-    status: str
+class RecentRoomResponse(BaseModel):
+    """Недавняя комната пользователя (только ключевые поля)."""
+    room_id: str
+    room_name: str
+    last_visit: str
+    submissions_count: int
+    participant_count: int
+    final_score: Optional[float] = None
+
+
+class ModelResponse(BaseModel):
+    """Модель ответа для генерации текста (non-streaming)."""
+
+    text: str = Field(..., description="Сгенерированный текст")

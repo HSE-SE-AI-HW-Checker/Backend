@@ -25,7 +25,7 @@ from src.models.schemas import (
     LogoutResponse, SubmittedData, ModelResponse
 )
 
-from src.routers.rooms import router as rooms_router
+from src.app_routes import register_application_routes
 
 ALIASES = {
     "--port": "port",
@@ -272,7 +272,7 @@ class Server:
                 "success": result.get("success", False)
             }
 
-        @self.app.get("/me")
+        @self.app.get("/me", summary="[dev only] Получить профиль текущего пользователя")
         async def get_profile(current_user: dict = Depends(get_current_user)):
             """
             Получить профиль текущего пользователя.
@@ -337,7 +337,7 @@ class Server:
 
             return ModelResponse(text=response)
 
-        self.app.include_router(rooms_router)
+        register_application_routes(self)
 
     def run(self):
         """Запустить сервер."""

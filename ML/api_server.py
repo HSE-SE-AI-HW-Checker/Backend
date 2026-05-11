@@ -122,7 +122,7 @@ async def lifespan(app: FastAPI):
         
         # Инициализируем логгер
         logger = Logger(
-            name="AI_local_api",
+            name="ML_logs",
             level=config_manager.app.log_level
         )
         logger.info("API сервер запущен")
@@ -133,39 +133,19 @@ async def lifespan(app: FastAPI):
             logger=logger
         )
         
-        # Проверяем наличие модели
-        download_config = config_manager.download
-        try:
-            model_path = model_downloader.ensure_model_available(
-                repo_id=download_config.repo_id,
-                filename=download_config.filename,
-                auto_download=download_config.auto_download,
-                token=download_config.token
-            )
-            logger.info(f"Модель доступна: {model_path}")
-        except Exception as e:
-            logger.error(f"Ошибка при проверке модели: {e}")
-            raise
-        
         # Инициализируем и загружаем модель
         model_manager = ModelManager(
             config=config_manager.model,
             logger=logger
         )
         
-        print("Загрузка модели AI...")
         logger.info("Начало загрузки модели")
         model_manager.load_model()
         logger.info("Модель успешно загружена")
-        print("Модель успешно загружена!")
         
         # Выводим информацию о модели
         model_info = model_manager.get_model_info()
-        logger.info(f"Модель: {model_info['path']}")
-        logger.info(f"Контекст: {model_info['n_ctx']} токенов")
-        logger.info(f"GPU слои: {model_info['n_gpu_layers']}")
-        
-        print("API сервер готов к работе!")
+        logger.info(f"Модель:\n{'\n'.join([f'{k}: {v}' for (k, v) in list(model_info.items())])}")
         
         yield
         
@@ -184,7 +164,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="AI Local API",
-    description="REST API для взаимодействия с локальной моделью ИИ",
+    description="REST API для взаимодействия с моделью ИИ",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -265,7 +245,6 @@ async def generate(request: GenerateRequest):
     """
     Эндпоинт для генерации текста.
     
-    В streaming режиме возвращает Server-Sent Events.
     В non-streaming режиме возвращает полный ответ в JSON.
     """
     logger.info("Получен запрос на /generate.")
@@ -276,9 +255,22 @@ async def generate(request: GenerateRequest):
                 detail="Модель не загружена"
             )
         
-        logger.info(f"Получен запрос на генерацию: prompt_length={len(request.prompt)}, stream={request.stream}")
+        logger.info(f"""Запрос на генерацию:
+<prompt>
+{request.prompt}
+</prompt>
+""")
         
-        # Собираем параметры генерации
+        # Генерация по API
+        if model_manager.config.use_api:
+            return GenerateResponse(
+                text=model_manager.model.responses.create(
+                    model=model_manager.config.filename,
+                    input=request.prompt
+                ).output_text
+            )
+        
+        # Локальная генерация
         params = {
             'temperature': request.temperature,
             'max_tokens': request.max_tokens,
@@ -288,54 +280,41 @@ async def generate(request: GenerateRequest):
             'stop': request.stop,
         }
         
-        if request.stream:
-            # Streaming режим - возвращаем SSE
-            logger.info("Запуск streaming генерации")
-            return StreamingResponse(
-                generate_stream(request.prompt, params),
-                media_type="text/event-stream",
-                headers={
-                    "Cache-Control": "no-cache",
-                    "Connection": "keep-alive",
-                    "X-Accel-Buffering": "no"
-                }
-            )
-        else:
-            # Non-streaming режим - возвращаем полный ответ
-            logger.info("Запуск non-streaming генерации")
+        # Non-streaming режим - возвращаем полный ответ
+        logger.info("Запуск non-streaming генерации")
             
-            # Создаем временный конфиг с переопределенными параметрами
-            temp_config = config_manager.model
+        # Создаем временный конфиг с переопределенными параметрами
+        temp_config = config_manager.model
             
-            if params.get('temperature') is not None:
-                temp_config.temperature = params['temperature']
-            if params.get('max_tokens') is not None:
-                temp_config.max_tokens = params['max_tokens']
-            if params.get('top_p') is not None:
-                temp_config.top_p = params['top_p']
-            if params.get('top_k') is not None:
-                temp_config.top_k = params['top_k']
-            if params.get('repeat_penalty') is not None:
-                temp_config.repeat_penalty = params['repeat_penalty']
-            if params.get('stop') is not None:
+        if params.get('temperature') is not None:
+            temp_config.temperature = params['temperature']
+        if params.get('max_tokens') is not None:
+            temp_config.max_tokens = params['max_tokens']
+        if params.get('top_p') is not None:
+            temp_config.top_p = params['top_p']
+        if params.get('top_k') is not None:
+            temp_config.top_k = params['top_k']
+        if params.get('repeat_penalty') is not None:
+            temp_config.repeat_penalty = params['repeat_penalty']
+        if params.get('stop') is not None:
                 temp_config.stop = params['stop']
             
-            # Отключаем streaming
-            temp_config.stream = False
+        # Отключаем streaming
+        temp_config.stream = False
             
-            # Создаем временный model_manager
-            temp_model_manager = ModelManager(config=temp_config, logger=logger)
-            temp_model_manager.model = model_manager.model
-            temp_model_manager._is_loaded = True
+        # Создаем временный model_manager
+        temp_model_manager = ModelManager(config=temp_config, logger=logger)
+        temp_model_manager.model = model_manager.model
+        temp_model_manager._is_loaded = True
             
-            # Генерируем полный ответ
-            response_text = temp_model_manager.generate_response_complete(request.prompt)
+        # Генерируем полный ответ
+        response_text = temp_model_manager.generate_response_complete(request.prompt)
             
-            logger.info(f"Генерация завершена: response_length={len(response_text)}")
+        logger.info(f"Генерация завершена: response_length={len(response_text)}")
             
-            return GenerateResponse(
-                text=response_text,
-            )
+        return GenerateResponse(
+            text=response_text,
+        )
     
     except HTTPException:
         raise
@@ -425,7 +404,7 @@ def main():
         host="0.0.0.0",
         port=8000,
         log_level="info",
-        reload=True
+        reload=False
     )
 
 

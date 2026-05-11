@@ -113,7 +113,7 @@ class FolderStructure:
         {file_content}
         </file>\n
         """
-        return f"{file_path}\n{'=' * 40}\n{self.file_contents[file_path]}\n{'=' * 40}\n"
+        return f"<file name={file_path}>\n\n{self.file_contents[file_path]}\n</file>\n"
     
     def get_files_content(self):
         """

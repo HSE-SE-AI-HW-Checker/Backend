@@ -4,33 +4,21 @@
 
 # Активная модель (раскомментируй нужную модель)
 
+active_model: "gpt-5-mini-api"
 # active_model: "deepseek-coder-v2-lite"
-# active_model: "llama-3.1-8b"
 # active_model: "mistral-nemo-12b"
-active_model: "qwen-2.5-coder-14b"
+# active_model: "qwen-2.5-coder-14b"
 # active_model: "qwen-2.5-coder-7b"
 # active_model: "qwen3.6-27b"
 
 app:
-  log_level: "WARNING"
+  log_level: "INFO"
 
 models:
-  llama-3.1-8b:
+  gpt-5-mini-api:
     download:
-      repo_id: "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF"
-      filename: "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
-      auto_download: true
-    model:
-      path: "./models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
-      n_ctx: 16384
-      n_gpu_layers: -1
-      temperature: 0.2
-      top_p: 0.9
-      top_k: 40
-      repeat_penalty: 1.1
-      max_tokens: 1024
-      stream: true
-
+      api_base: "https://api.perplexity.ai/v1"
+      model_name: "openai/gpt-5-mini"
   deepseek-coder-v2-lite:
     download:
       repo_id: "bartowski/DeepSeek-Coder-V2-Lite-Instruct-GGUF"
