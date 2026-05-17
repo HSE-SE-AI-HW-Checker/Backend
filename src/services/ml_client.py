@@ -10,6 +10,21 @@ import requests
 logger = logging.getLogger(__name__)
 
 
+def ml_verify_criterion(ml_url: str, criterion_text: str, timeout: int = 120) -> bool:
+    """
+    Вызывает POST /verify_criterion на ML-сервере.
+    Возвращает True, если LLM считает критерий применимым для ИИ-проверки.
+    """
+    response = requests.post(
+        f"{ml_url.rstrip('/')}/verify_criterion",
+        json={"criterion_text": criterion_text},
+        headers={"Content-Type": "application/json"},
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    return bool(response.json().get("can_ai_verified", False))
+
+
 def ml_generate_non_stream(
     ml_url: str,
     prompt: str,

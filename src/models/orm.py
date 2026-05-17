@@ -97,6 +97,8 @@ class RoomMember(Base):
     last_visit = Column(TIMESTAMP, nullable=False, server_default=func.now())
     submissions_count = Column(Integer, nullable=False, default=0)
     deadline = Column(TIMESTAMP, nullable=True)
+    submission_url = Column(String, nullable=True)
+    owner_comment = Column(String, nullable=True)
 
 
 class Criterion(Base):

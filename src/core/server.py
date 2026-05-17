@@ -13,11 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 
 from src.utils.helpers import BackendPath, parse_submitted_data
-from src.core.config_manager import get_ml_server_address
 from src.models.config import ServerConfig
 from src.services.ml_payload_bounds import utf8_payload_size_bytes
-from src.services.orchestration_service import Orchestrator
-from src.services.langgraph_orchestration_service import LangGraphOrchestrator
 from src.security import get_current_user
 from src.core.constants import DEFAULT_MOCK_RESPONSE
 from src.models.schemas import (
@@ -26,6 +23,45 @@ from src.models.schemas import (
 )
 
 from src.app_routes import register_application_routes
+from src.services.orchestration_service import Orchestrator
+
+
+
+def _parse_ai_score(text: str):
+    """Парсит markdown-ответ и возвращает средний балл по шкале 0-100."""
+    import json
+    import re
+
+    header_re = re.compile(r'## Requirement \d+ \([^)]+\)')
+    matches = list(header_re.finditer(text))
+    scores = []
+    for i, match in enumerate(matches):
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        block = text[start:end].strip()
+        json_start = block.find('{')
+        if json_start < 0:
+            continue
+        depth = 0
+        json_end = -1
+        for j in range(json_start, len(block)):
+            if block[j] == '{':
+                depth += 1
+            elif block[j] == '}':
+                depth -= 1
+                if depth == 0:
+                    json_end = j
+                    break
+        if json_end < 0:
+            continue
+        try:
+            data = json.loads(block[json_start:json_end + 1])
+            scores.append(float(data['score']))
+        except (json.JSONDecodeError, KeyError, TypeError):
+            continue
+    if not scores:
+        return None
+    return round(sum(scores) / len(scores) * 10, 2)
 
 ALIASES = {
     "--port": "port",
@@ -295,14 +331,21 @@ class Server:
             Отправка домашнего задания (защищенный эндпоинт).
 
             Args:
-                homework_data: Данные домашнего задания
+                submitted_data: Данные домашнего задания
                 current_user: Текущий пользователь из токена
 
             Returns:
                 dict: Ответ от ML сервера
             """
+            room_result = self.db.get_room(submitted_data.room_id)
+            if room_result.get("error"):
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Комната с id '{submitted_data.room_id}' не найдена"
+                )
 
-            project_data = parse_submitted_data(submitted_data)
+            room = room_result["room"]
+            project_data = parse_submitted_data(submitted_data, language_key=room.get("language"))
             if not project_data:
                 return ModelResponse(text=DEFAULT_MOCK_RESPONSE)
 
@@ -317,25 +360,29 @@ class Server:
                     ),
                 )
 
-            warn_frac = float(getattr(self.config, 'ml_input_warn_fraction', 0.5) or 0.0)
-            if max_bytes > 0 and warn_frac > 0:
-                warn_threshold = max(1, int(max_bytes * warn_frac))
-                if size_bytes >= warn_threshold:
-                    self.logger.log(
-                        f"WARNING: объём входных текстовых данных для модели {size_bytes} байт "
-                        f"(лимит {max_bytes}). Возможна нехватка контекста; при сбоях стоит увеличить n_ctx или сократить проект."
-                    )
+            orchestrator = Orchestrator(self.config.ml_url)
+            requirements = {c["criterion_text"]: i for i, c in enumerate(room["criteria"])}
+            response_text = orchestrator.audit(requirements, project_data)
 
-            ml_url = get_ml_server_address()
-            try:
-                orchestrator_primary = LangGraphOrchestrator(ml_url)
-                response = orchestrator_primary.audit(submitted_data.requirements, project_data)
-            except Exception as exc:
-                self.logger.log(f"LangGraph audit failed, fallback to Orchestrator: {exc}")
-                legacy_orchestrator = Orchestrator(ml_url)
-                response = legacy_orchestrator.audit(submitted_data.requirements, project_data)
 
-            return ModelResponse(text=response)
+            # Сохраняем ai_score и submission_url; инкрементируем submissions_count
+            ai_score = _parse_ai_score(response_text)
+            submission_url = submitted_data.data if submitted_data.data_type == 0 else None
+
+            member_result = self.db.get_room_member(current_user["user_id"], submitted_data.room_id)
+            current_count = 0
+            if not member_result.get("error") and member_result.get("member"):
+                current_count = member_result["member"].get("submissions_count", 0) or 0
+
+            update_kwargs: dict = {"submissions_count": current_count + 1}
+            if ai_score is not None:
+                update_kwargs["ai_score"] = ai_score
+            if submission_url is not None:
+                update_kwargs["submission_url"] = submission_url
+
+            self.db.update_member_scores(current_user["user_id"], submitted_data.room_id, **update_kwargs)
+
+            return ModelResponse(text=response_text)
 
         register_application_routes(self)
 

@@ -11,6 +11,8 @@ def _sqlite_row_to_member(row) -> dict:
         "last_visit": str(row[5]),
         "submissions_count": row[6],
         "deadline": str(row[7]) if row[7] is not None else None,
+        "submission_url": row[8] if len(row) > 8 else None,
+        "owner_comment": row[9] if len(row) > 9 else None,
     }
 
 
@@ -35,7 +37,7 @@ class SQLiteRoomMembersMixin:
     def get_room_member(self, user_id: int, room_id: str) -> dict:
         try:
             self.cursor.execute(
-                "SELECT user_id, room_id, ai_score, final_score, owner_score, last_visit, submissions_count, deadline "
+                "SELECT user_id, room_id, ai_score, final_score, owner_score, last_visit, submissions_count, deadline, submission_url, owner_comment "
                 "FROM room_members WHERE user_id = ? AND room_id = ?",
                 (user_id, room_id),
             )
@@ -49,7 +51,7 @@ class SQLiteRoomMembersMixin:
     def get_room_members(self, room_id: str) -> dict:
         try:
             self.cursor.execute(
-                "SELECT user_id, room_id, ai_score, final_score, owner_score, last_visit, submissions_count, deadline "
+                "SELECT user_id, room_id, ai_score, final_score, owner_score, last_visit, submissions_count, deadline, submission_url, owner_comment "
                 "FROM room_members WHERE room_id = ?",
                 (room_id,),
             )
@@ -58,11 +60,52 @@ class SQLiteRoomMembersMixin:
         except sqlite3.Error as e:
             return {"members": [], "error": True, "message": str(e)}
 
-    def update_owner_score(self, user_id: int, room_id: str, owner_score: float) -> dict:
+    def get_room_members_with_users(self, room_id: str) -> dict:
         try:
             self.cursor.execute(
-                "UPDATE room_members SET owner_score = ? WHERE user_id = ? AND room_id = ?",
-                (owner_score, user_id, room_id),
+                """
+                SELECT rm.user_id, rm.room_id, rm.ai_score, rm.final_score, rm.owner_score,
+                       rm.last_visit, rm.submissions_count, rm.deadline, rm.submission_url,
+                       rm.owner_comment, u.username, u.email
+                FROM room_members rm
+                JOIN users u ON rm.user_id = u.id
+                WHERE rm.room_id = ?
+                """,
+                (room_id,),
+            )
+            rows = self.cursor.fetchall()
+            members = []
+            for row in rows:
+                m = _sqlite_row_to_member(row)
+                m["username"] = row[10]
+                m["email"] = row[11]
+                members.append(m)
+            return {"members": members, "error": False}
+        except sqlite3.Error as e:
+            return {"members": [], "error": True, "message": str(e)}
+
+    def update_owner_score(self, user_id: int, room_id: str, owner_score: float, owner_comment: str = None) -> dict:
+        try:
+            self.cursor.execute(
+                "SELECT ai_score FROM room_members WHERE user_id = ? AND room_id = ?",
+                (user_id, room_id),
+            )
+            row = self.cursor.fetchone()
+            if row is None:
+                return {"error": True, "message": "Участник комнаты не найден"}
+
+            ai_score = row[0]
+            updates = {"owner_score": owner_score}
+            if ai_score is not None:
+                updates["final_score"] = round(ai_score * 0.4 + owner_score * 0.6, 2)
+            if owner_comment is not None:
+                updates["owner_comment"] = owner_comment
+
+            set_clause = ", ".join(f"{k} = ?" for k in updates)
+            values = list(updates.values()) + [user_id, room_id]
+            self.cursor.execute(
+                f"UPDATE room_members SET {set_clause} WHERE user_id = ? AND room_id = ?",
+                values,
             )
             self.connection.commit()
             if self.cursor.rowcount == 0:
@@ -169,18 +212,52 @@ class SARoomMembersMixin:
         finally:
             session.close()
 
-    def update_owner_score(self, user_id: int, room_id: str, owner_score: float) -> dict:
+    def get_room_members_with_users(self, room_id: str) -> dict:
+        from ...models.orm import RoomMember, User
+
+        session = self.get_session()
+        try:
+            rows = (
+                session.query(RoomMember, User.username, User.email)
+                .join(User, RoomMember.user_id == User.id)
+                .filter(RoomMember.room_id == room_id)
+                .all()
+            )
+            members = []
+            for member, username, email in rows:
+                m = _sa_member_to_dict(member)
+                m["username"] = username
+                m["email"] = email
+                members.append(m)
+            return {"members": members, "error": False}
+        except Exception as e:
+            return {"members": [], "error": True, "message": str(e)}
+        finally:
+            session.close()
+
+    def update_owner_score(self, user_id: int, room_id: str, owner_score: float, owner_comment: str = None) -> dict:
         from ...models.orm import RoomMember
 
         session = self.get_session()
         try:
-            updated = session.query(RoomMember).filter(
+            member = session.query(RoomMember).filter(
                 RoomMember.user_id == user_id,
                 RoomMember.room_id == room_id,
-            ).update({"owner_score": owner_score})
-            session.commit()
-            if updated == 0:
+            ).first()
+            if member is None:
                 return {"error": True, "message": "Участник комнаты не найден"}
+
+            updates = {"owner_score": owner_score}
+            if member.ai_score is not None:
+                updates["final_score"] = round(member.ai_score * 0.4 + owner_score * 0.6, 2)
+            if owner_comment is not None:
+                updates["owner_comment"] = owner_comment
+
+            session.query(RoomMember).filter(
+                RoomMember.user_id == user_id,
+                RoomMember.room_id == room_id,
+            ).update(updates)
+            session.commit()
             return {"error": False}
         except Exception as e:
             session.rollback()
@@ -236,6 +313,8 @@ class SARoomMembersMixin:
 
         if "deadline" in fields and isinstance(fields["deadline"], str):
             fields["deadline"] = datetime.fromisoformat(fields["deadline"])
+        if "last_visit" in fields and isinstance(fields["last_visit"], str):
+            fields["last_visit"] = datetime.fromisoformat(fields["last_visit"])
 
         session = self.get_session()
         try:
@@ -264,4 +343,6 @@ def _sa_member_to_dict(member) -> dict:
         "last_visit": str(member.last_visit),
         "submissions_count": member.submissions_count,
         "deadline": member.deadline.isoformat() if member.deadline else None,
+        "submission_url": member.submission_url,
+        "owner_comment": member.owner_comment,
     }

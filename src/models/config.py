@@ -50,6 +50,7 @@ class ServerConfig:
     ml_input_max_bytes: int = 524288  # 512 KiB по умолчанию
     ml_input_warn_fraction: float = 0.5  # WARNING при достижении доли от лимита
     available_languages_path: str = "available_languages.json"
+    ml_url: Optional[str] = None
 
     def __post_init__(self):
         """Валидация полей после инициализации."""
@@ -211,6 +212,7 @@ class ServerConfig:
             'ml_input_max_bytes': self.ml_input_max_bytes,
             'ml_input_warn_fraction': self.ml_input_warn_fraction,
             'available_languages_path': self.available_languages_path,
+            'ml_url': self.ml_url,
         }
     
     def __repr__(self) -> str:

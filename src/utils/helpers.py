@@ -150,7 +150,8 @@ def parse_submitted_data(submitted_data, *, language_key: Optional[str] = None):
             token = os.getenv("GITHUB_TOKEN")
             explorer = GitHubRepoExplorer(token=token, whitelist=whitelist_dots)
             return explorer.get_repo_contents(submitted_data.data)
-        except Exception:
+        except Exception as e:
+            print(e)
             return None
     # Архив
     elif submitted_data.data_type == 1:

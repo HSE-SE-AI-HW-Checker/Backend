@@ -6,6 +6,7 @@ HTTP-маршруты приложения (комнаты, критерии, я
 from __future__ import annotations
 
 import random
+from datetime import datetime
 from typing import TYPE_CHECKING, List
 
 from fastapi import Depends, HTTPException
@@ -24,6 +25,7 @@ from src.models.schemas import (
     RoomResponse,
     ScoresUpdate,
 )
+from src.services.ml_client import ml_verify_criterion
 from src.security import get_current_user
 
 if TYPE_CHECKING:
@@ -150,7 +152,15 @@ def register_application_routes(server: "Server") -> None:
         if existing["criterion"] is not None:
             return {"can_ai_verified": existing["criterion"]["ai_verified"]}
 
-        can_ai_verified = random.choice([True, False])
+        ml_url = getattr(server.config, "ml_url", None) or ""
+        if ml_url:
+            try:
+                can_ai_verified = ml_verify_criterion(ml_url, data.criterion_text)
+            except Exception:
+                can_ai_verified = random.choice([True, False])
+        else:
+            can_ai_verified = random.choice([True, False])
+
         result = db.create_criterion(
             criterion_text=data.criterion_text,
             ai_verified=can_ai_verified,
@@ -204,7 +214,7 @@ def register_application_routes(server: "Server") -> None:
 
     @app.get("/rooms/{room_id}/members", response_model=List[RoomMemberResponse])
     async def get_room_members(room_id: str, _: dict = Depends(get_current_user)):
-        result = db.get_room_members(room_id)
+        result = db.get_room_members_with_users(room_id)
         if result.get("error"):
             raise HTTPException(status_code=500, detail=result["message"])
         return result["members"]
@@ -216,6 +226,10 @@ def register_application_routes(server: "Server") -> None:
             raise HTTPException(status_code=500, detail=result["message"])
         if result["member"] is None:
             raise HTTPException(status_code=404, detail="Вы не являетесь участником этой комнаты")
+        db.update_member_scores(
+            current_user["user_id"], room_id,
+            last_visit=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        )
         return result["member"]
 
     @app.patch("/rooms/{room_id}/members/{user_id}/score", response_model=RoomMemberResponse)
@@ -231,7 +245,7 @@ def register_application_routes(server: "Server") -> None:
         if room["room"]["creator_id"] != current_user["user_id"]:
             raise HTTPException(status_code=403, detail="Только владелец комнаты может выставлять оценки")
 
-        result = db.update_owner_score(user_id, room_id, data.owner_score)
+        result = db.update_owner_score(user_id, room_id, data.owner_score, data.owner_comment)
         if result.get("error"):
             raise HTTPException(status_code=404, detail=result["message"])
 

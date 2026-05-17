@@ -83,9 +83,21 @@ class ModelInfoResponse(BaseModel):
     stream: bool = Field(..., description="Streaming режим")
 
 
+class VerifyCriterionRequest(BaseModel):
+    """Модель запроса для проверки критерия."""
+
+    criterion_text: str = Field(..., description="Текст критерия для проверки", min_length=1)
+
+
+class VerifyCriterionResponse(BaseModel):
+    """Модель ответа для проверки критерия."""
+
+    can_ai_verified: bool = Field(..., description="Может ли критерий быть проверен через ИИ")
+
+
 class ErrorResponse(BaseModel):
     """Модель ответа с ошибкой."""
-    
+
     error: str = Field(..., description="Описание ошибки")
     detail: Optional[str] = Field(None, description="Детали ошибки")
 
@@ -227,8 +239,92 @@ async def generate_stream(prompt: str, params: dict) -> AsyncIterator[str]:
 
 
 # ============================================================================
+# Вспомогательные функции для проверки критериев
+# ============================================================================
+
+def _build_criterion_prompt(criterion_text: str) -> str:
+    return f"""
+Ты - опытный технический аналитик. Твоя задача - определить, является ли предоставленное требование техническим и проверяемым в контексте программного кода, и может ли оно быть проверено одним из доступных специалистов.
+
+Доступные специалисты:
+1. security (информационная безопасность, уязвимости)
+2. performance (производительность, алгоритмическая сложность)
+3. maintainability (чистота кода, стиль, документация)
+4. functional (бизнес-логика, краевые случаи)
+5. architecture (паттерны, связность модулей)
+
+Требование может быть НЕ релевантным, если оно:
+- Относится к организационным процессам (например, "проводить дейли митинги").
+- Относится к дизайну/UI без привязки к коду (например, "кнопка должна быть красивой").
+- Относится к системным требованиям (например, "программа должна работать на мощном сервере").
+- Является слишком абстрактным или субъективным.
+- Не может быть проверено статическим анализом кода или тестами.
+
+ТРЕБОВАНИЕ:
+<requirement>
+{criterion_text}
+</requirement>
+
+Ответь ТОЛЬКО одним словом:
+- YES - если требование техническое и может быть проверено одним из специалистов.
+- NO - если требование не относится к коду или не может быть проверено.
+
+Пример ответа 1:
+YES
+
+Пример ответа 2:
+NO
+"""
+
+
+# ============================================================================
 # API эндпоинты
 # ============================================================================
+
+@app.post(
+    "/verify_criterion",
+    response_model=VerifyCriterionResponse,
+    responses={
+        200: {"description": "Результат проверки критерия"},
+        503: {"model": ErrorResponse, "description": "Модель не загружена"},
+        500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
+    },
+    summary="Проверка критерия",
+    description="Определяет, может ли критерий быть проверен через ИИ. Вызывается основным бэкендом из /criteria/verify.",
+)
+async def verify_criterion(request: VerifyCriterionRequest):
+    logger.info(f"Получен запрос на /verify_criterion: {request.criterion_text[:80]}")
+    try:
+        if not model_manager or not model_manager.is_loaded():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Модель не загружена",
+            )
+
+        prompt = _build_criterion_prompt(request.criterion_text)
+
+        if model_manager.config.use_api:
+            raw = model_manager.model.responses.create(
+                model=model_manager.config.filename,
+                input=prompt,
+            ).output_text.strip()
+        else:
+            raw = model_manager.generate_response_complete(prompt).strip()
+        token = raw.upper().split()[0] if raw.split() else ""
+        can_ai_verified = token == "YES"
+
+        logger.info(f"Результат проверки критерия: {can_ai_verified} (raw={raw!r})")
+        return VerifyCriterionResponse(can_ai_verified=can_ai_verified)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при проверке критерия: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при проверке критерия: {str(e)}",
+        )
+
 
 @app.post(
     "/generate",

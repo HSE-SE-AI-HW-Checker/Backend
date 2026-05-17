@@ -34,3 +34,7 @@ jwt_secret_key: "WbOYKdUjvyFDt1brR3z5Y7DjpOPYkYj0x6K49pm4sLA"
 jwt_algorithm: HS256
 jwt_access_token_expire_minutes: 30
 jwt_refresh_token_expire_days: 7
+
+# URL Backend/ML сервера (порт 8000) для проверки критериев
+# Если не задан — /criteria/verify использует random-заглушку
+ml_url: "http://localhost:8000"
