@@ -114,11 +114,15 @@ class SQLite(SQLiteUsersMixin, SQLiteSessionsMixin, SQLiteRoomsMixin,
         self.cursor.execute('CREATE INDEX IF NOT EXISTS idx_room_members_user_id ON room_members(user_id)')
         self.cursor.execute('CREATE INDEX IF NOT EXISTS idx_room_members_room_id ON room_members(room_id)')
 
-        # Миграция room_members: добавить deadline если нет
+        # Миграция room_members: добавить новые колонки если нет
         self.cursor.execute("PRAGMA table_info(room_members)")
         rm_columns = {row[1] for row in self.cursor.fetchall()}
         if 'deadline' not in rm_columns:
             self.cursor.execute("ALTER TABLE room_members ADD COLUMN deadline TIMESTAMP")
+        if 'submission_url' not in rm_columns:
+            self.cursor.execute("ALTER TABLE room_members ADD COLUMN submission_url TEXT")
+        if 'owner_comment' not in rm_columns:
+            self.cursor.execute("ALTER TABLE room_members ADD COLUMN owner_comment TEXT")
 
         self.connection.commit()
 

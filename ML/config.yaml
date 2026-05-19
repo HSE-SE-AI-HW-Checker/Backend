@@ -1,44 +1,31 @@
 # Конфигурация ML моделей
-# Поддерживается переключение между моделями через active_model
+# Токены Hugging Face задаются через переменные окружения в Backend/.env:
+# HF_TOKEN или HUGGINGFACE_HUB_TOKEN
 
-# Активная модель (раскоментируй нужную модель)
+# Активная модель (раскомментируй нужную модель)
 
+active_model: "gpt-5-mini-api"
 # active_model: "deepseek-coder-v2-lite"
-# active_model: "llama-3.1-8b"
 # active_model: "mistral-nemo-12b"
-active_model: "qwen-2.5-coder-14b"
+# active_model: "qwen-2.5-coder-14b"
 # active_model: "qwen-2.5-coder-7b"
+# active_model: "qwen3.6-27b"
+
+app:
+  log_level: "INFO"
 
 models:
-  # LLaMA 3.1 8B Instruct
-  llama-3.1-8b:
+  gpt-5-mini-api:
     download:
-      repo_id: "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF"
-      filename: "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
-      auto_download: true
-      token: "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"
-    model:
-      path: "./models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
-      # Если видишь ошибку декодера с кодом -3, уменьшай это значение
-      n_ctx: 16384
-      n_gpu_layers: -1
-      temperature: 0.2
-      top_p: 0.9
-      top_k: 40
-      repeat_penalty: 1.1
-      max_tokens: 1024
-      stream: true
-
-  # DeepSeek Coder V2 Lite Instruct
+      api_base: "https://api.perplexity.ai/v1"
+      model_name: "openai/gpt-5-mini"
   deepseek-coder-v2-lite:
     download:
       repo_id: "bartowski/DeepSeek-Coder-V2-Lite-Instruct-GGUF"
       filename: "DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M.gguf"
       auto_download: true
-      token: "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"
     model:
       path: "./models/DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M.gguf"
-      # Если видишь ошибку декодера с кодом -3, уменьшай это значение
       n_ctx: 19000
       n_gpu_layers: -1
       temperature: 0.3
@@ -48,16 +35,13 @@ models:
       max_tokens: 2048
       stream: true
 
-  # Mistral Nemo 12B Instruct
   mistral-nemo-12b:
     download:
       repo_id: "bartowski/Mistral-Nemo-Instruct-2407-GGUF"
       filename: "Mistral-Nemo-Instruct-2407-Q4_K_M.gguf"
       auto_download: true
-      token: "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"
     model:
       path: "./models/Mistral-Nemo-Instruct-2407-Q4_K_M.gguf"
-      # Если видишь ошибку декодера с кодом -3, уменьшай это значение
       n_ctx: 16384
       n_gpu_layers: -1
       temperature: 0.2
@@ -67,36 +51,30 @@ models:
       max_tokens: 1024
       stream: true
 
-  # Qwen 2.5 Coder 14B Instruct
   qwen-2.5-coder-14b:
     download:
       repo_id: "bartowski/Qwen2.5-Coder-14B-Instruct-GGUF"
       filename: "Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf"
       auto_download: true
-      token: "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"
     model:
       path: "./models/Qwen2.5-Coder-14B-Instruct-Q4_K_M.gguf"
-      # Если видишь ошибку декодера с кодом -3, уменьшай это значение
-      n_ctx: 16384
+      n_ctx: 19000
       n_gpu_layers: -1
       temperature: 0.2
       top_p: 0.95
       top_k: 40
-      repeat_penalty: 1.05
+      repeat_penalty: 1.6
       max_tokens: 1024
       stream: true
 
-  # Qwen 2.5 Coder 7B Instruct
   qwen-2.5-coder-7b:
     download:
       repo_id: "bartowski/Qwen2.5-Coder-7B-Instruct-GGUF"
       filename: "Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf"
       auto_download: true
-      token: "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"
     model:
       path: "./models/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf"
-      # Если видишь ошибку декодера с кодом -3, уменьшай это значение
-      n_ctx: 16384
+      n_ctx: 19000
       n_gpu_layers: -1
       temperature: 0.2
       top_p: 0.95
@@ -104,8 +82,3 @@ models:
       repeat_penalty: 1.05
       max_tokens: 1024
       stream: true
-
-# Настройки приложения
-app:
-  # Уровень логирования: DEBUG, INFO, WARNING, ERROR, CRITICAL
-  log_level: "INFO"

@@ -1,0 +1,14 @@
+{
+  "languages": [
+    { "id": "cpp", "name": "C++", "extensions": ["cpp", "cxx", "cc", "c", "h", "hpp"] },
+    { "id": "python", "name": "Python", "extensions": ["py"] },
+    { "id": "java", "name": "Java", "extensions": ["java"] },
+    { "id": "csharp", "name": "C#", "extensions": ["cs"] },
+    {
+      "id": "javascript",
+      "name": "JavaScript / TypeScript",
+      "extensions": ["js", "mjs", "cjs", "jsx", "ts", "tsx"]
+    }
+  ],
+  "general": ["txt", "md", "xml", "json", "yaml", "yml", "gradle", "properties", "gitignore"]
+}

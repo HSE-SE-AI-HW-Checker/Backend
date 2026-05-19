@@ -46,7 +46,12 @@ class ServerConfig:
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 30
     jwt_refresh_token_expire_days: int = 7
-    
+    # Ограничение объёма UTF-8 текста (структура + файлы) для ML-пайплайна
+    ml_input_max_bytes: int = 524288  # 512 KiB по умолчанию
+    ml_input_warn_fraction: float = 0.5  # WARNING при достижении доли от лимита
+    available_languages_path: str = "available_languages.json"
+    ml_url: Optional[str] = None
+
     def __post_init__(self):
         """Валидация полей после инициализации."""
         self._validate()
@@ -109,7 +114,17 @@ class ServerConfig:
 
         if not isinstance(self.jwt_refresh_token_expire_days, int) or self.jwt_refresh_token_expire_days <= 0:
             raise ValueError("jwt_refresh_token_expire_days должен быть положительным целым числом")
-    
+
+        if not isinstance(self.ml_input_max_bytes, int):
+            raise ValueError("ml_input_max_bytes должен быть целым числом")
+        if self.ml_input_max_bytes < 0:
+            raise ValueError("ml_input_max_bytes не может быть отрицательным")
+
+        wf = float(self.ml_input_warn_fraction)
+        if not (0 < wf <= 1):
+            raise ValueError("ml_input_warn_fraction должен быть в (0, 1]")
+        self.ml_input_warn_fraction = wf
+
     @classmethod
     def from_yaml(cls, file_path: str) -> 'ServerConfig':
         """
@@ -193,7 +208,11 @@ class ServerConfig:
             'jwt_secret_key': self.jwt_secret_key,
             'jwt_algorithm': self.jwt_algorithm,
             'jwt_access_token_expire_minutes': self.jwt_access_token_expire_minutes,
-            'jwt_refresh_token_expire_days': self.jwt_refresh_token_expire_days
+            'jwt_refresh_token_expire_days': self.jwt_refresh_token_expire_days,
+            'ml_input_max_bytes': self.ml_input_max_bytes,
+            'ml_input_warn_fraction': self.ml_input_warn_fraction,
+            'available_languages_path': self.available_languages_path,
+            'ml_url': self.ml_url,
         }
     
     def __repr__(self) -> str:

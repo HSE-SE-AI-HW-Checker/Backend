@@ -3,6 +3,8 @@
 Загружает и валидирует параметры из YAML файла.
 """
 
+import os
+
 import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -15,6 +17,7 @@ class DownloadConfig:
     repo_id: str
     filename: str
     auto_download: bool
+    use_api: bool
     token: Optional[str] = None
 
 
@@ -30,6 +33,7 @@ class ModelConfig:
     repeat_penalty: float
     max_tokens: int
     stream: bool
+    stop: list[str]
 
 
 @dataclass
@@ -81,31 +85,26 @@ class ConfigManager:
                 raise ValueError(f"Активная модель '{active_model}' не найдена в секции 'models'")
             
             model_config = self._config['models'][active_model]
+            self.use_api = 'api_base' in model_config['download']
+            
             if 'download' not in model_config:
                 raise ValueError(f"Отсутствует секция 'download' для модели '{active_model}'")
-            if 'model' not in model_config:
+            if 'model' not in model_config and not self.use_api:
                 raise ValueError(f"Отсутствует секция 'model' для модели '{active_model}'")
                 
             download_section = model_config['download']
-            model_section = model_config['model']
+            model_section = model_config.get('model', None)
         else:
-            # Обратная совместимость
-            if 'download' not in self._config:
-                raise ValueError("Отсутствует секция 'download' в конфигурации")
-            if 'model' not in self._config:
-                raise ValueError("Отсутствует секция 'model' в конфигурации")
-                
-            download_section = self._config['download']
-            model_section = self._config['model']
+            raise ValueError(f"В файле конфигурации для ML должно быть поле active_model и словарь models")
         
         # Проверка обязательных полей загрузки
-        required_download_fields = ['repo_id', 'filename', 'auto_download']
+        required_download_fields = ['model_name'] if self.use_api else ['repo_id', 'filename', 'auto_download']
         for field in required_download_fields:
             if field not in download_section:
                 raise ValueError(f"Отсутствует обязательное поле 'download.{field}'")
         
         # Проверка обязательных полей модели
-        required_model_fields = ['path', 'n_ctx', 'n_gpu_layers']
+        required_model_fields = ['path', 'n_ctx', 'n_gpu_layers'] if model_section else []
         for field in required_model_fields:
             if field not in model_section:
                 raise ValueError(f"Отсутствует обязательное поле 'model.{field}'")
@@ -121,26 +120,30 @@ class ConfigManager:
 
         # Парсим конфигурацию загрузки
         download_cfg = source_config['download']
+        hf_token = os.getenv('HF_TOKEN') or os.getenv('HUGGINGFACE_HUB_TOKEN')
         self._download_config = DownloadConfig(
-            repo_id=download_cfg['repo_id'],
-            filename=download_cfg['filename'],
+            repo_id=download_cfg['api_base'] if self.use_api else download_cfg['repo_id'],
+            filename=download_cfg['model_name'] if self.use_api else download_cfg['filename'],
             auto_download=download_cfg.get('auto_download', True),
-            token=download_cfg.get('token')
+            token=os.getenv('MODEL_API_KEY') if self.use_api else hf_token,
+            use_api=self.use_api
         )
         
-        model_cfg = source_config['model']
-        self._model_config = ModelConfig(
-            path=model_cfg['path'],
-            n_ctx=model_cfg.get('n_ctx', 2048),
-            n_gpu_layers=model_cfg.get('n_gpu_layers', -1),
-            temperature=model_cfg.get('temperature', 0.7),
-            top_p=model_cfg.get('top_p', 0.9),
-            top_k=model_cfg.get('top_k', 40),
-            repeat_penalty=model_cfg.get('repeat_penalty', 1.1),
-            max_tokens=model_cfg.get('max_tokens', 512),
-            stream=model_cfg.get('stream', True)
-        )
-        
+        if not self.use_api:
+            model_cfg = source_config['model']
+            self._model_config = ModelConfig(
+                path=model_cfg['path'],
+                n_ctx=model_cfg.get('n_ctx', 2048),
+                n_gpu_layers=model_cfg.get('n_gpu_layers', -1),
+                temperature=model_cfg.get('temperature', 0.7),
+                top_p=model_cfg.get('top_p', 0.9),
+                top_k=model_cfg.get('top_k', 40),
+                repeat_penalty=model_cfg.get('repeat_penalty', 1.1),
+                max_tokens=model_cfg.get('max_tokens', 512),
+                stream=model_cfg.get('stream', True),
+                stop=model_cfg.get('stop', [])
+            )
+
         app_cfg = self._config['app']
         self._app_config = AppConfig(
             log_level=app_cfg.get('log_level', 'INFO')
@@ -150,25 +153,27 @@ class ConfigManager:
     def download(self) -> DownloadConfig:
         """Получение конфигурации загрузки."""
         if not self._download_config:
-            raise RuntimeError("Конфигурация не загружена. Вызовите load() сначала.")
+            raise RuntimeError("Конфигурация (download) не загружена. Вызовите load() сначала.")
         return self._download_config
     
     @property
     def model(self) -> ModelConfig:
         """Получение конфигурации модели."""
+        if self.use_api:
+            return self.download
         if not self._model_config:
-            raise RuntimeError("Конфигурация не загружена. Вызовите load() сначала.")
+            raise RuntimeError("Конфигурация (model) не загружена. Вызовите load() сначала.")
         return self._model_config
     
     @property
     def app(self) -> AppConfig:
         """Получение конфигурации приложения."""
         if not self._app_config:
-            raise RuntimeError("Конфигурация не загружена. Вызовите load() сначала.")
+            raise RuntimeError("Конфигурация (app) не загружена. Вызовите load() сначала.")
         return self._app_config
     
     def get_raw_config(self) -> Dict[str, Any]:
         """Получение сырой конфигурации."""
         if not self._config:
-            raise RuntimeError("Конфигурация не загружена. Вызовите load() сначала.")
+            raise RuntimeError("Конфигурация (raw) не загружена. Вызовите load() сначала.")
         return self._config

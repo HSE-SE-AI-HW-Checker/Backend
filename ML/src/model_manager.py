@@ -25,16 +25,41 @@ class ModelManager:
     
     def load_model(self) -> None:
         """Загрузка модели LLaMA из файла."""
+        if self.config.use_api:
+            self._api_client_init()
+        else:
+            self._local_model_load()
+
+    def _api_client_init(self) -> None:
+        self.logger.info("Запуск API-клиента")
+        try:
+            from openai import OpenAI
+        except ImportError as e:
+            raise ImportError(f"Библиотека OpenAI не установлена, установите с помощью: pip install openai")
+        try:
+            self.model = OpenAI(
+                base_url=self.config.repo_id,
+                api_key=self.config.token
+            )
+            self._is_loaded = True
+            self.logger.info("API-клиент успешно запущен")
+        except Exception as e:
+            raise RuntimeError(f"При создании API-клиента возникла ошибка: {e}")
+
+    def _local_model_load(self) -> None:
+        # TODO: enable
+        self.logger.info("Загрузка локальной модели...")
+        return
         try:
             # Проверяем существование файла модели
             model_path = Path(self.config.path)
             if not model_path.exists():
                 raise FileNotFoundError(f"Файл модели не найден: {self.config.path}")
-            
+
             if self.logger:
                 self.logger.info(f"Загрузка модели из {self.config.path}")
                 self.logger.info(f"Параметры: n_ctx={self.config.n_ctx}, n_gpu_layers={self.config.n_gpu_layers}")
-            
+
             # Импортируем llama-cpp-python
             try:
                 from llama_cpp import Llama
@@ -43,7 +68,7 @@ class ModelManager:
                     "llama-cpp-python не установлен. "
                     "Установите с помощью: pip install llama-cpp-python"
                 )
-            
+
             # Загружаем модель с параметрами из конфигурации
             self.model = Llama(
                 model_path=str(model_path),
@@ -51,13 +76,12 @@ class ModelManager:
                 n_gpu_layers=self.config.n_gpu_layers,
                 verbose=False  # Отключаем verbose вывод llama.cpp
             )
-            
-            
+
             self._is_loaded = True
-            
+
             if self.logger:
                 self.logger.info("Модель успешно загружена")
-                
+
         except Exception as e:
             if self.logger:
                 self.logger.error(f"Ошибка при загрузке модели: {e}")
@@ -88,24 +112,16 @@ class ModelManager:
                 "top_p": self.config.top_p,
                 "top_k": self.config.top_k,
                 "repeat_penalty": self.config.repeat_penalty,
-                "stream": self.config.stream
+                "stream": self.config.stream,
+                "stop": getattr(self.config, 'stop', [])
             }
             
-            # Генерируем ответ
-            if self.config.stream:
-                # Streaming режим - возвращаем токены по мере генерации
-                for output in self.model(**generation_params):
-                    if "choices" in output and len(output["choices"]) > 0:
-                        choice = output["choices"][0]
-                        if "text" in choice:
-                            yield choice["text"]
-            else:
-                # Не-streaming режим - возвращаем весь ответ сразу
-                output = self.model(**generation_params)
-                if "choices" in output and len(output["choices"]) > 0:
-                    choice = output["choices"][0]
-                    if "text" in choice:
-                        yield choice["text"]
+            # Не-streaming режим - возвращаем весь ответ сразу
+            output = self.model(**generation_params)
+            if "choices" in output and len(output["choices"]) > 0:
+                choice = output["choices"][0]
+                if "text" in choice:
+                    yield choice["text"]
             
             if self.logger:
                 self.logger.debug("Генерация ответа завершена")
@@ -161,6 +177,9 @@ class ModelManager:
             Словарь с информацией о модели
         """
         return {
+            "api_base": self.config.repo_id,
+            "model_name": self.config.filename
+        } if self.config.use_api else {
             "path": self.config.path,
             "loaded": self._is_loaded,
             "n_ctx": self.config.n_ctx,

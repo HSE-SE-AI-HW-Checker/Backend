@@ -45,8 +45,7 @@ class LogoutResponse(BaseModel):
 class SubmittedData(BaseModel):
     """Данные домашнего задания."""
     data: str
-    # текст требования, тип требования (нужен ли мл для проверки?)
-    requirements: Dict[str, int]
+    room_id: str
     data_type: int
 
 
@@ -122,6 +121,7 @@ class CriterionVerifyResponse(BaseModel):
 class OwnerScoreUpdate(BaseModel):
     """Запрос на обновление оценки владельца."""
     owner_score: float = Field(..., ge=0, le=100, description="Оценка от владельца комнаты (0–100)")
+    owner_comment: Optional[str] = Field(None, description="Комментарий проверяющего")
 
 
 class ScoresUpdate(BaseModel):
@@ -143,6 +143,10 @@ class RoomMemberResponse(BaseModel):
     last_visit: str
     submissions_count: int
     deadline: Optional[str] = None
+    submission_url: Optional[str] = None
+    owner_comment: Optional[str] = None
+    username: Optional[str] = None
+    email: Optional[str] = None
 
 
 class RecentRoomResponse(BaseModel):
@@ -159,4 +163,3 @@ class ModelResponse(BaseModel):
     """Модель ответа для генерации текста (non-streaming)."""
 
     text: str = Field(..., description="Сгенерированный текст")
-    prompt: str = Field(..., description="Исходный промпт")

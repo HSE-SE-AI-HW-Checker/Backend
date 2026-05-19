@@ -7,6 +7,11 @@ FastAPI сервер для локального запуска ИИ модел�
 import sys
 import asyncio
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Токены и секреты бэкенда: Backend/.env (родитель текущего каталога ML)
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 from typing import Optional, AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -39,6 +44,7 @@ class GenerateRequest(BaseModel):
     top_p: Optional[float] = Field(None, description="Top-p sampling (0.0-1.0)", ge=0.0, le=1.0)
     top_k: Optional[int] = Field(None, description="Top-k sampling", ge=1, le=100)
     repeat_penalty: Optional[float] = Field(None, description="Штраф за повторения (1.0-2.0)", ge=1.0, le=2.0)
+    stop: Optional[list[str]] = Field(None, description="Список стоп-слов")
     stream: bool = Field(True, description="Использовать streaming режим")
     
     @validator('prompt')
@@ -53,7 +59,6 @@ class GenerateResponse(BaseModel):
     """Модель ответа для генерации текста (non-streaming)."""
     
     text: str = Field(..., description="Сгенерированный текст")
-    prompt: str = Field(..., description="Исходный промпт")
 
 
 class HealthResponse(BaseModel):
@@ -78,9 +83,21 @@ class ModelInfoResponse(BaseModel):
     stream: bool = Field(..., description="Streaming режим")
 
 
+class VerifyCriterionRequest(BaseModel):
+    """Модель запроса для проверки критерия."""
+
+    criterion_text: str = Field(..., description="Текст критерия для проверки", min_length=1)
+
+
+class VerifyCriterionResponse(BaseModel):
+    """Модель ответа для проверки критерия."""
+
+    can_ai_verified: bool = Field(..., description="Может ли критерий быть проверен через ИИ")
+
+
 class ErrorResponse(BaseModel):
     """Модель ответа с ошибкой."""
-    
+
     error: str = Field(..., description="Описание ошибки")
     detail: Optional[str] = Field(None, description="Детали ошибки")
 
@@ -117,7 +134,7 @@ async def lifespan(app: FastAPI):
         
         # Инициализируем логгер
         logger = Logger(
-            name="AI_local_api",
+            name="ML_logs",
             level=config_manager.app.log_level
         )
         logger.info("API сервер запущен")
@@ -128,39 +145,19 @@ async def lifespan(app: FastAPI):
             logger=logger
         )
         
-        # Проверяем наличие модели
-        download_config = config_manager.download
-        try:
-            model_path = model_downloader.ensure_model_available(
-                repo_id=download_config.repo_id,
-                filename=download_config.filename,
-                auto_download=download_config.auto_download,
-                token=download_config.token
-            )
-            logger.info(f"Модель доступна: {model_path}")
-        except Exception as e:
-            logger.error(f"Ошибка при проверке модели: {e}")
-            raise
-        
         # Инициализируем и загружаем модель
         model_manager = ModelManager(
             config=config_manager.model,
             logger=logger
         )
         
-        print("Загрузка модели AI...")
         logger.info("Начало загрузки модели")
         model_manager.load_model()
         logger.info("Модель успешно загружена")
-        print("Модель успешно загружена!")
         
         # Выводим информацию о модели
         model_info = model_manager.get_model_info()
-        logger.info(f"Модель: {model_info['path']}")
-        logger.info(f"Контекст: {model_info['n_ctx']} токенов")
-        logger.info(f"GPU слои: {model_info['n_gpu_layers']}")
-        
-        print("API сервер готов к работе!")
+        logger.info(f"Модель:\n{'\n'.join([f'{k}: {v}' for (k, v) in list(model_info.items())])}")
         
         yield
         
@@ -179,7 +176,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="AI Local API",
-    description="REST API для взаимодействия с локальной моделью ИИ",
+    description="REST API для взаимодействия с моделью ИИ",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -215,6 +212,8 @@ async def generate_stream(prompt: str, params: dict) -> AsyncIterator[str]:
             temp_config.top_k = params['top_k']
         if params.get('repeat_penalty') is not None:
             temp_config.repeat_penalty = params['repeat_penalty']
+        if params.get('stop') is not None:
+            temp_config.stop = params['stop']
         
         # Включаем streaming
         temp_config.stream = True
@@ -240,8 +239,92 @@ async def generate_stream(prompt: str, params: dict) -> AsyncIterator[str]:
 
 
 # ============================================================================
+# Вспомогательные функции для проверки критериев
+# ============================================================================
+
+def _build_criterion_prompt(criterion_text: str) -> str:
+    return f"""
+Ты - опытный технический аналитик. Твоя задача - определить, является ли предоставленное требование техническим и проверяемым в контексте программного кода, и может ли оно быть проверено одним из доступных специалистов.
+
+Доступные специалисты:
+1. security (информационная безопасность, уязвимости)
+2. performance (производительность, алгоритмическая сложность)
+3. maintainability (чистота кода, стиль, документация)
+4. functional (бизнес-логика, краевые случаи)
+5. architecture (паттерны, связность модулей)
+
+Требование может быть НЕ релевантным, если оно:
+- Относится к организационным процессам (например, "проводить дейли митинги").
+- Относится к дизайну/UI без привязки к коду (например, "кнопка должна быть красивой").
+- Относится к системным требованиям (например, "программа должна работать на мощном сервере").
+- Является слишком абстрактным или субъективным.
+- Не может быть проверено статическим анализом кода или тестами.
+
+ТРЕБОВАНИЕ:
+<requirement>
+{criterion_text}
+</requirement>
+
+Ответь ТОЛЬКО одним словом:
+- YES - если требование техническое и может быть проверено одним из специалистов.
+- NO - если требование не относится к коду или не может быть проверено.
+
+Пример ответа 1:
+YES
+
+Пример ответа 2:
+NO
+"""
+
+
+# ============================================================================
 # API эндпоинты
 # ============================================================================
+
+@app.post(
+    "/verify_criterion",
+    response_model=VerifyCriterionResponse,
+    responses={
+        200: {"description": "Результат проверки критерия"},
+        503: {"model": ErrorResponse, "description": "Модель не загружена"},
+        500: {"model": ErrorResponse, "description": "Внутренняя ошибка сервера"},
+    },
+    summary="Проверка критерия",
+    description="Определяет, может ли критерий быть проверен через ИИ. Вызывается основным бэкендом из /criteria/verify.",
+)
+async def verify_criterion(request: VerifyCriterionRequest):
+    logger.info(f"Получен запрос на /verify_criterion: {request.criterion_text[:80]}")
+    try:
+        if not model_manager or not model_manager.is_loaded():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Модель не загружена",
+            )
+
+        prompt = _build_criterion_prompt(request.criterion_text)
+
+        if model_manager.config.use_api:
+            raw = model_manager.model.responses.create(
+                model=model_manager.config.filename,
+                input=prompt,
+            ).output_text.strip()
+        else:
+            raw = model_manager.generate_response_complete(prompt).strip()
+        token = raw.upper().split()[0] if raw.split() else ""
+        can_ai_verified = token == "YES"
+
+        logger.info(f"Результат проверки критерия: {can_ai_verified} (raw={raw!r})")
+        return VerifyCriterionResponse(can_ai_verified=can_ai_verified)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при проверке критерия: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при проверке критерия: {str(e)}",
+        )
+
 
 @app.post(
     "/generate",
@@ -258,7 +341,6 @@ async def generate(request: GenerateRequest):
     """
     Эндпоинт для генерации текста.
     
-    В streaming режиме возвращает Server-Sent Events.
     В non-streaming режиме возвращает полный ответ в JSON.
     """
     logger.info("Получен запрос на /generate.")
@@ -269,64 +351,66 @@ async def generate(request: GenerateRequest):
                 detail="Модель не загружена"
             )
         
-        logger.info(f"Получен запрос на генерацию: prompt_length={len(request.prompt)}, stream={request.stream}")
+        logger.info(f"""Запрос на генерацию:
+<prompt>
+{request.prompt}
+</prompt>
+""")
         
-        # Собираем параметры генерации
+        # Генерация по API
+        if model_manager.config.use_api:
+            return GenerateResponse(
+                text=model_manager.model.responses.create(
+                    model=model_manager.config.filename,
+                    input=request.prompt
+                ).output_text
+            )
+        
+        # Локальная генерация
         params = {
             'temperature': request.temperature,
             'max_tokens': request.max_tokens,
             'top_p': request.top_p,
             'top_k': request.top_k,
             'repeat_penalty': request.repeat_penalty,
+            'stop': request.stop,
         }
         
-        if request.stream:
-            # Streaming режим - возвращаем SSE
-            logger.info("Запуск streaming генерации")
-            return StreamingResponse(
-                generate_stream(request.prompt, params),
-                media_type="text/event-stream",
-                headers={
-                    "Cache-Control": "no-cache",
-                    "Connection": "keep-alive",
-                    "X-Accel-Buffering": "no"
-                }
-            )
-        else:
-            # Non-streaming режим - возвращаем полный ответ
-            logger.info("Запуск non-streaming генерации")
+        # Non-streaming режим - возвращаем полный ответ
+        logger.info("Запуск non-streaming генерации")
             
-            # Создаем временный конфиг с переопределенными параметрами
-            temp_config = config_manager.model
+        # Создаем временный конфиг с переопределенными параметрами
+        temp_config = config_manager.model
             
-            if params.get('temperature') is not None:
-                temp_config.temperature = params['temperature']
-            if params.get('max_tokens') is not None:
-                temp_config.max_tokens = params['max_tokens']
-            if params.get('top_p') is not None:
-                temp_config.top_p = params['top_p']
-            if params.get('top_k') is not None:
-                temp_config.top_k = params['top_k']
-            if params.get('repeat_penalty') is not None:
-                temp_config.repeat_penalty = params['repeat_penalty']
+        if params.get('temperature') is not None:
+            temp_config.temperature = params['temperature']
+        if params.get('max_tokens') is not None:
+            temp_config.max_tokens = params['max_tokens']
+        if params.get('top_p') is not None:
+            temp_config.top_p = params['top_p']
+        if params.get('top_k') is not None:
+            temp_config.top_k = params['top_k']
+        if params.get('repeat_penalty') is not None:
+            temp_config.repeat_penalty = params['repeat_penalty']
+        if params.get('stop') is not None:
+                temp_config.stop = params['stop']
             
-            # Отключаем streaming
-            temp_config.stream = False
+        # Отключаем streaming
+        temp_config.stream = False
             
-            # Создаем временный model_manager
-            temp_model_manager = ModelManager(config=temp_config, logger=logger)
-            temp_model_manager.model = model_manager.model
-            temp_model_manager._is_loaded = True
+        # Создаем временный model_manager
+        temp_model_manager = ModelManager(config=temp_config, logger=logger)
+        temp_model_manager.model = model_manager.model
+        temp_model_manager._is_loaded = True
             
-            # Генерируем полный ответ
-            response_text = temp_model_manager.generate_response_complete(request.prompt)
+        # Генерируем полный ответ
+        response_text = temp_model_manager.generate_response_complete(request.prompt)
             
-            logger.info(f"Генерация завершена: response_length={len(response_text)}")
+        logger.info(f"Генерация завершена: response_length={len(response_text)}")
             
-            return GenerateResponse(
-                text=response_text,
-                prompt=''
-            )
+        return GenerateResponse(
+            text=response_text,
+        )
     
     except HTTPException:
         raise
