@@ -24,6 +24,10 @@ class SQLiteRoomMembersMixin:
                 "INSERT INTO room_members (user_id, room_id) VALUES (?, ?)",
                 (user_id, room_id),
             )
+            self.cursor.execute(
+                "UPDATE rooms SET participant_count = participant_count + 1 WHERE id = ?",
+                (room_id,),
+            )
             self.connection.commit()
             return {"error": False}
         except sqlite3.IntegrityError as e:
@@ -166,12 +170,15 @@ class SQLiteRoomMembersMixin:
 class SARoomMembersMixin:
 
     def join_room(self, user_id: int, room_id: str) -> dict:
-        from ...models.orm import RoomMember
+        from ...models.orm import RoomMember, Room
         from sqlalchemy.exc import IntegrityError
 
         session = self.get_session()
         try:
             session.add(RoomMember(user_id=user_id, room_id=room_id))
+            session.query(Room).filter(Room.id == room_id).update(
+                {"participant_count": Room.participant_count + 1}
+            )
             session.commit()
             return {"error": False}
         except IntegrityError:
